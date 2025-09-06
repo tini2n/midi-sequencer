@@ -1,43 +1,81 @@
 #include <Arduino.h>
+#include "model/pattern.hpp"
+#include "model/viewport.hpp"
+#include "ui/renderer_oled.hpp"
 
-#include "core/tick_scheduler.hpp"
-#include "config.hpp"
+static Pattern pattern;
+static Viewport viewport;
+static OledRenderer oled;
 
-TickScheduler scheduler;
-
-static uint32_t intervals[1000];
-static uint16_t idx = 0;
-static uint32_t last_us = 0;
-
-static void sort_u32(uint32_t* a, size_t n){   // simple insertion sort
-  for(size_t i=1;i<n;i++){ uint32_t k=a[i], j=i; 
-    while(j>0 && a[j-1]>k){ a[j]=a[j-1]; j--; } a[j]=k; }
+static uint32_t rng = 0xC0FFEEu;
+static uint32_t rnd()
+{
+  rng = 1664525u * rng + 1013904223u;
+  return rng;
 }
 
-void setup() {
+static void fillDummy(Pattern &p)
+{
+  p.track.clear();
+  for (int i = 0; i < 100; i++)
+  {
+    uint32_t t = (rnd() % p.ticks());
+    uint32_t l = 40 + (rnd() % 400);
+    uint8_t pitch = 36 + (rnd() % 32);
+    uint8_t vel = 80 + (rnd() % 47);
+    p.track.notes.push_back({t, l, pitch, vel, 0, 0});
+  }
+}
+
+void setup()
+{
   Serial.begin(115200);
-  while(!Serial && millis()<1500){}           // teensy USB wait
-  Serial.println("Clock&Scheduler bring-up @1kHz");
-  if(!scheduler.begin()) Serial.println("Timer begin failed!");
+  while (!Serial && millis() < 1500)
+  {
+  }
+  fillDummy(pattern);
+  oled.begin();
+  Serial.println("Viewport controls: A/D pan, W/S zoom, Z/X pitch base, R regen");
 }
 
-void loop() {
-  TickEvent e;
-  while(scheduler.fetch(e)){
-    if(last_us){ 
-      uint32_t dt = e.tmicros - last_us;
-      if(idx<1000) intervals[idx++] = (dt>cfg::TICK_US)? (dt-cfg::TICK_US) : (cfg::TICK_US-dt);
-    }
-    last_us = e.tmicros;
+void loop()
+{
+  // controls (non-blocking)
+  static bool uiDirty = false;
+  static char hud[48];
+
+  while (Serial.available())
+  {
+    char c = Serial.read();
+    Serial.printf("key:%c\n", c);
+    uiDirty = true;
+
+    if (c == 'a' || c == 'A')
+      viewport.pan_ticks(-(int32_t)(viewport.tickSpan / 8));
+    if (c == 'd' || c == 'D')
+      viewport.pan_ticks((int32_t)(viewport.tickSpan / 8));
+    if (c == 'w' || c == 'W')
+      viewport.zoom_ticks(1.25f);
+    if (c == 's' || c == 'S')
+      viewport.zoom_ticks(0.8f);
+    if (c == 'z' || c == 'Z')
+      viewport.pan_pitch(-1);
+    if (c == 'x' || c == 'X')
+      viewport.pan_pitch(+1);
+    if (c == 'r' || c == 'R')
+      fillDummy(pattern);
   }
 
-  if(idx==1000){
-    sort_u32(intervals, 1000);
-    uint32_t p95 = intervals[950];
-    uint32_t p50 = intervals[500];
-    uint32_t pmax= intervals[999];
-    Serial.printf("Jitter abs-error (us): p50=%lu p95=%lu max=%lu, dropped=%lu, depth~ %lu\n",
-                  p50, p95, pmax, (unsigned long)scheduler.dropped(), (unsigned long)0);
-    idx=0; last_us=0; delay(1000);            // repeat runs
+  snprintf(hud, sizeof(hud), "t:%lu span:%lu pb:%u", viewport.tickStart, viewport.tickSpan, viewport.pitchBase);
+
+  static uint32_t nextDraw = 0;
+  uint32_t now = micros();
+  if ((int32_t)(now - nextDraw) >= 0)
+  {
+    uint32_t frame = oled.drawFrame(pattern, viewport, now, hud);
+    if (frame > 25000)
+      Serial.printf("WARN frame=%lu us > 25ms\n", (unsigned long)frame);
+    nextDraw = now + 50000; // 20 FPS cap (I2C)
+    uiDirty = false;
   }
 }
