@@ -7,8 +7,7 @@ struct Viewport
     static constexpr int16_t W = 128, H = 64;
 
     uint32_t tickStart{0}, tickSpan{2048};
-    uint8_t pitchBase{12}, lanes{12}; // rows on 64px
-    uint8_t grid{16};
+    uint8_t pitchBase{12}, grid{16};
 
     void clamp(uint32_t maxTicks)
     {
