@@ -21,8 +21,6 @@ private:
     static int32_t xFromTick(uint32_t tick, const Viewport &v);
     static int16_t yFromPitch(uint8_t pitch, const Viewport &v);
 
-    
-
     void drawGrid(U8G2 &u8g2, const Viewport &v);
     void drawLanes(U8G2 &u8g2, const Viewport &v);
     void drawNotes(U8G2 &u8g2, const Track &t, const Viewport &v);
