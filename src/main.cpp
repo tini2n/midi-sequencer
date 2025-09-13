@@ -9,6 +9,7 @@
 #include "engine/playback_engine.hpp"
 
 #include "ui/renderer_oled.hpp"
+#include "ui/views/performance_view.hpp"
 
 static constexpr uint16_t PPQN = 96;
 static inline uint32_t ticksPerStep(uint16_t gridDiv) { return (uint32_t(PPQN) * 4u) / gridDiv; }
@@ -20,6 +21,7 @@ MidiIO midi;
 Pattern pat;
 Viewport vp;
 OledRenderer oled;
+static PerformanceView perf;
 
 static uint32_t rng = 0xC0FFEEu;
 static inline uint32_t rnd()
@@ -63,25 +65,51 @@ static void handleKeys()
   while (Serial.available())
   {
     char c = Serial.read();
-
     // instant transport
     if (c == 'P' || c == 'p')
     {
       transport.start();
       midi.sendStart();
-      return;
+      continue;
     }
     if (c == 'S')
     {
       transport.stop();
       midi.sendStop();
-      return;
+      continue;
     }
     if (c == 'R' || c == 'r')
     {
       transport.resume();
       midi.sendContinue();
-      return;
+      continue;
+    }
+
+    // utility buttons
+    if (c == '+' || c == '=')
+    {
+      perf.octaveUp();
+      continue;
+    }
+    if (c == '-' || c == '_')
+    {
+      perf.octaveDown();
+      continue;
+    }
+    if (c == 'm' || c == 'M')
+    {
+      perf.cycleMode();
+      continue;
+    }
+    if (c == 'h' || c == 'H')
+    {
+      perf.toggleHold();
+      continue;
+    }
+    if (c == ';')
+    {
+      perf.panic(midi);
+      continue;
     }
 
     // instant nav (don’t buffer)
@@ -238,12 +266,15 @@ void setup()
   vp.pitchBase = 36;
   vp.tickSpan = ticksPerStep(pat.grid) * visSteps;
 
+  perf.begin(pat.track.channel);
+
   // regenNotes();
 }
 
 void loop()
 {
-  handleKeys();
+  perf.handleInput(midi);
+  // handleKeys();
 
   TickEvent e;
   TickWindow w;
@@ -279,16 +310,19 @@ void loop()
   uint32_t now = micros();
   if ((int32_t)(now - nextDraw) >= 0)
   {
-    char hud[64];
-    snprintf(hud, sizeof(hud), "ch:%u bpm:%d tick:%lu", pat.track.channel, (int)pat.tempo, (unsigned long)transport.playTick());
+    // char hud[64];
+    // snprintf(hud, sizeof(hud), "ch:%u bpm:%d tick:%lu", pat.track.channel, (int)pat.tempo, (unsigned long)transport.playTick());
 
-    PianoRoll::Options o = {};
-    o.highlightPitch = -1;
+    // PianoRoll::Options o = {};
+    // o.highlightPitch = -1;
 
-    oled.rollSetOptions(o);
-    uint32_t frame = oled.drawFrame(pat, vp, now, transport.playTick(), hud);
-    if (frame > 25000)
-      Serial.printf("WARN frame=%lu us > 25ms\n", (unsigned long)frame);
-    nextDraw = now + 50000; // ~20 FPS, non-blocking
+    // oled.rollSetOptions(o);
+    // uint32_t frame = oled.drawFrame(pat, vp, now, transport.playTick(), hud);
+    // if (frame > 25000)
+    //   Serial.printf("WARN frame=%lu us > 25ms\n", (unsigned long)frame);
+    // nextDraw = now + 50000; // ~20 FPS, non-blocking
+
+    perf.tick(pat, vp, oled, midi, now, transport.playTick());
+    nextDraw = now + 50000; // ~20 FPS
   }
 }
