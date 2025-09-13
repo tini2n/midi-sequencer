@@ -66,6 +66,11 @@ void PianoRoll::drawLanes(U8G2 &u8g2, const Viewport &v)
         uint8_t p = pb + row;
         int16_t y0 = H - (row + 1) * LH;
 
+        if (p == (uint8_t)options_.highlightPitch)
+        { // 2px stripe near label
+            u8g2.drawBox(Layout::LABEL_W - 2, y0, 2, LH);
+        }
+
         if (isBlackKey(p))
             u8g2.drawBox(0, y0, LW, LH);
 

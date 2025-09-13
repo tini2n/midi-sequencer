@@ -14,14 +14,14 @@ uint32_t OledRenderer::drawFrame(const Pattern &p, const Viewport &v, uint32_t n
     do
     {
         pianoRoll_.render(u8g2_, p.track, v, playTick);
-        // if (hud)
-        // {
-        //     u8g2_.setFont(u8g2_font_5x7_tf);
-        //     u8g2_.drawBox(0, 0, 128, 8);
-        //     u8g2_.setDrawColor(0);
-        //     u8g2_.drawStr(1, 7, hud);
-        //     u8g2_.setDrawColor(1);
-        // }
+        if (hud)
+        {
+            u8g2_.setFont(u8g2_font_5x7_tf);
+            u8g2_.drawBox(0, 0, 128, 8);
+            u8g2_.setDrawColor(0);
+            u8g2_.drawStr(1, 7, hud);
+            u8g2_.setDrawColor(1);
+        }
     } while (u8g2_.nextPage());
     return (uint32_t)(micros() - t0);
 }

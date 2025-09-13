@@ -11,7 +11,9 @@ struct PianoRoll
     };
     struct Options
     {
-        uint8_t pMin = 0, pMax = 127; // TODO: Make filteration of notes in pitch range
+        // TODO: Make filteration of notes in pitch range
+        uint8_t pMin = 0, pMax = 127;
+        int16_t highlightPitch=-1; 
     } options_;
 
     void setOptions(const Options &o) { options_ = o; }

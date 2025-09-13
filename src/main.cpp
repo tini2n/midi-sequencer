@@ -9,6 +9,10 @@
 #include "engine/playback_engine.hpp"
 
 #include "ui/renderer_oled.hpp"
+#include "ui/cursor/cursor_input.hpp"
+#include "ui/cursor/keyboard_mapper.hpp"
+
+#include "music/scale.hpp"
 
 static constexpr uint16_t PPQN = 96;
 static inline uint32_t ticksPerStep(uint16_t gridDiv) { return (uint32_t(PPQN) * 4u) / gridDiv; }
@@ -20,6 +24,11 @@ MidiIO midi;
 Pattern pat;
 Viewport vp;
 OledRenderer oled;
+CursorSerial cursor;
+KeyboardMapper kbdMap;
+PerformanceState perfState{};
+
+int8_t activePitch[16];
 
 static uint32_t rng = 0xC0FFEEu;
 static inline uint32_t rnd()
@@ -29,7 +38,7 @@ static inline uint32_t rnd()
 }
 
 static uint16_t visSteps = 16; // S ∈ {1,2,4,8,16,32,64}
-static uint32_t t0ms = 0;
+// static uint32_t t0ms = 0;
 
 static void regenNotes()
 {
@@ -238,12 +247,53 @@ void setup()
   vp.pitchBase = 36;
   vp.tickSpan = ticksPerStep(pat.grid) * visSteps;
 
-  regenNotes();
+  // regenNotes();
+
+  for (auto &a : activePitch)
+    a = -1;
 }
 
 void loop()
 {
   handleKeys();
+
+  CursorEvent cev;
+  while (cursor.poll(cev))
+  {
+    auto m = kbdMap.map(cev.btn, perfState);
+    if (m.isCtrl)
+    {
+      if (m.octaveDelta)
+      {
+        perfState.octave = (int8_t)max(0, min(9, perfState.octave + m.octaveDelta));
+      }
+      // Mode button cycles (stub)
+      // else if(btn==7) perf.mode = ...;
+      continue;
+    }
+    if (cev.down)
+    {
+      uint8_t ch = pat.track.channel;
+      midi.send({ch, m.pitch, 100, true, 0});
+      activePitch[cev.btn] = (int8_t)m.pitch;
+      // highlight for 1 frame
+      PianoRoll::Options o = {};
+      o.highlightPitch = m.pitch;
+      o.pMin = 0;
+      o.pMax = 127;
+      // set once per loop before draw:
+      // roll_.setOptions(o); (expose a setter on OledRenderer or set globally if accessible)
+    }
+    else
+    {
+      if (activePitch[cev.btn] >= 0)
+      {
+        uint8_t ch = pat.track.channel;
+        midi.send({ch, (uint8_t)activePitch[cev.btn], 0, false, 0});
+        activePitch[cev.btn] = -1;
+      }
+    }
+  }
 
   TickEvent e;
   TickWindow w;
@@ -270,7 +320,6 @@ void loop()
   for (const auto &m : evs)
   {
     midi.send(m);
-    Serial.printf("EVT ch%u n%u v%u @%lu\n", m.ch, m.pitch, m.vel, (unsigned long)transport.playTick());
   }
 
   midi.update();
@@ -282,6 +331,11 @@ void loop()
   {
     char hud[64];
     snprintf(hud, sizeof(hud), "ch:%u bpm:%d tick:%lu", pat.track.channel, (int)pat.tempo, (unsigned long)transport.playTick());
+
+    PianoRoll::Options o = {};
+    o.highlightPitch = -1;
+
+    oled.rollSetOptions(o);
     uint32_t frame = oled.drawFrame(pat, vp, now, transport.playTick(), hud);
     if (frame > 25000)
       Serial.printf("WARN frame=%lu us > 25ms\n", (unsigned long)frame);
