@@ -51,13 +51,16 @@ public:
         return true;
     }
     uint32_t playTick() const { return play_; }
-
+    uint16_t tpqn() const { return tempo_.tpqn; }
+    uint8_t  clockDivisor() const { return 96 / (tempo_.tpqn / 24); } // e.g. TPQN=96 → 4
 private:
     Tempo tempo_{};
+    
+    bool running_{false};
+
     uint32_t uptick_{usPerTick(tempo_)};
     uint32_t loopLen_{1};
     uint32_t play_{0};
-    bool running_{false};
     uint32_t pend_{0};
     uint32_t phase_{0};
 };

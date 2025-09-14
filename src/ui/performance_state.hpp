@@ -1,12 +1,22 @@
 #pragma once
 #include <stdint.h>
 
-enum class PerformanceMode : uint8_t { Keyboard=0, Scale=1, Chromatic=2, Chord=3 };
+#include "music/scale.hpp"
 
-struct PerformanceState {
+enum class PerformanceMode : uint8_t
+{
+  Keyboard = 0,
+  Scale = 1,
+  Chromatic = 2,
+  Chord = 3
+};
+
+struct PerformanceState
+{
   PerformanceMode mode = PerformanceMode::Keyboard;
-  int8_t  octave = 4;          // MIDI 0–10 (clamped)
-  uint8_t root   = 0;          // 0=C … 11=B
-  uint16_t scaleMask = 0xAD5;  // C major default (1010 1101 0101)b
-  uint8_t channel = 13;        // use Pattern.track.channel at init
+  uint8_t channel{1};                  // use Pattern.track.channel at init
+  int8_t octave{0};                     // MIDI 0–10 (clamped)
+  uint8_t root{0};                      // 0=C … 11=B
+  uint8_t  velocity{127}; 
+  uint8_t  lastPitch{255};
 };

@@ -13,6 +13,7 @@ class OledRenderer
 public:
     bool begin();
     uint32_t drawFrame(const Pattern &, const Viewport &, uint32_t microsNow, uint32_t playTick = 0, const char *hud = nullptr);
+    
     public: void rollSetOptions(const PianoRoll::Options& o){ pianoRoll_.setOptions(o); }
 
 private:

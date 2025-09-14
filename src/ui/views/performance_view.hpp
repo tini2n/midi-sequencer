@@ -4,9 +4,6 @@
 #include <Arduino.h>
 
 #include "ui/performance_state.hpp"
-#include "ui/cursor/cursor_input.hpp"
-#include "ui/cursor/keyboard_mapper.hpp"
-#include "ui/cursor/chord_mapper.hpp"
 
 #include "core/midi_io.hpp"
 
@@ -14,31 +11,32 @@
 #include "model/viewport.hpp"
 
 #include "ui/renderer_oled.hpp"
+#include "ui/cursor/serial_keyboard_input.hpp"
 
 class PerformanceView
 {
 public:
-    void begin(uint8_t midiCh) { st_.channel = midiCh; }
-    void tick(Pattern &pat, Viewport &vp, OledRenderer &oled, MidiIO &midi, uint32_t now, uint32_t playTick);
-    void handleInput(MidiIO &midi);
+    void begin(uint8_t midiCh)
+    {
+        st_.channel = midiCh;
+        kb_.begin(0, 4, 100); // root=C, octave=4, vel=100
+    }
+    void draw(Pattern &pat, Viewport &vp, OledRenderer &oled, MidiIO &midi, uint32_t now, uint32_t playTick);
+    void poll(MidiIO &midi)
+    {
+        int last = -1;
+        kb_.poll(midi, st_.channel, &last);
+        if (last >= 0)
+            st_.lastPitch = last;
+    }
 
-    void octaveUp();
-    void octaveDown();
-    void cycleMode();
-    void toggleHold();
-    void panic(MidiIO &m);
+    void setRoot(uint8_t semis) { kb_.setRoot(semis); }
+    void setOctave(int8_t o) { kb_.setOctave(o); }
+
+    PerformanceState &state() { return st_; }
+    void setLastPitch(int p) { st_.lastPitch = p; }
 
 private:
     PerformanceState st_{};
-    CursorInput input_;
-    KeyboardMapper km_;
-    ChordMapper cm_;
-
-    std::unordered_map<uint8_t, uint8_t> active_; // btnId->pitch
-    int8_t lastPitch_ = -1;
-
-    void sendOn(MidiIO &m, uint8_t p) { m.send(MidiEvent{st_.channel, p, 127, true, 0}); }
-    void sendOff(MidiIO &m, uint8_t p) { m.send(MidiEvent{st_.channel, p, 0, false, 0}); }
-    
-    void handleFunction(uint8_t btn);
+    SerialKB kb_;
 };
