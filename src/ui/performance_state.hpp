@@ -1,8 +1,6 @@
 #pragma once
 #include <stdint.h>
 
-#include "music/scale.hpp"
-
 enum class PerformanceMode : uint8_t
 {
   Keyboard = 0,
