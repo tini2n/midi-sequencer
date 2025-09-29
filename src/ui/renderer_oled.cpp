@@ -4,7 +4,7 @@ bool OledRenderer::begin()
 {
     u8g2_.begin();
     u8g2_.setContrast(80);
-    u8g2_.setBusClock(1000000);
+    u8g2_.setBusClock(400000); // 400kHz
     return true;
 }
 uint32_t OledRenderer::drawFrame(const Pattern &p, const Viewport &v, uint32_t now, uint32_t playTick, const char *hud)

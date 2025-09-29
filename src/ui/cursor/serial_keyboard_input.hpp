@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "core/midi_io.hpp"
 
+// I2C 0x20
 class SerialKB
 {
 public:
