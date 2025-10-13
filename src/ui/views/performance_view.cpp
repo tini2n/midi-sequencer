@@ -10,6 +10,7 @@ void PerformanceView::draw(Pattern &pat, Viewport &vp, OledRenderer &oled, MidiI
     char hud[48];
     const char *modeStr = (st_.mode == PerformanceMode::Keyboard) ? "KB" : (st_.mode == PerformanceMode::Scale) ? "SC"
                                                                                                                 : "CHR";
+    // Simple HUD: mode, ch, octave, tempo. Transport/rec status can be shown via icons later.
     snprintf(hud, sizeof(hud), "%s CH:%u OC:%d BP:%d", modeStr, st_.channel, st_.octave, (int)pat.tempo);
 
     PianoRoll::Options o = {};

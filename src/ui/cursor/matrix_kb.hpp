@@ -2,6 +2,9 @@
 #include <Arduino.h>
 #include "core/midi_io.hpp"
 #include "io/pcf8575.hpp"
+#include "core/runloop.hpp"
+#include "core/transport.hpp"
+#include "engine/record_engine.hpp"
 
 class MatrixKB
 {
@@ -13,7 +16,6 @@ public:
         uint8_t cols[8] = {0, 1, 2, 3, 4, 5, 6, 7};
         uint8_t rowTop = 1, rowBot = 2, rowCtl = 0;
         uint32_t debounce_us = 3000;
-        uint16_t settle_us = 80; // settle time after row drive
     };
     bool begin(const Config &c, uint8_t root = 0, int8_t octave = 4, uint8_t vel = 100)
     {
@@ -52,6 +54,14 @@ public:
         }
     }
 
+    // Attach external systems for control events and recording hooks
+    void attach(RunLoop *rl, RecordEngine *rec, Transport *tx)
+    {
+        rl_ = rl;
+        rec_ = rec;
+        tx_ = tx;
+    }
+
     void poll(MidiIO &midi, uint8_t ch, int *lastPitchOpt = nullptr)
     {
         uint32_t now = micros();
@@ -59,7 +69,7 @@ public:
         {
             driveRow(r);
             // Allow signals to settle like in the smoke test (~80us)
-            delayMicroseconds(cfg_.settle_us);
+            delayMicroseconds(80);
             uint16_t pins = 0xFFFF;
             if (!pcf_.read(pins))
             {
@@ -82,16 +92,18 @@ public:
                 debUntil_[btn] = now + cfg_.debounce_us;
                 if (r == cfg_.rowCtl)
                 {
-                    // Control keys act on press only
-                    if (down)
-                        onControl(c);
+                    onControl(c, down);
                     continue;
                 }
-                // Main keyboard: Note ON on press, Note OFF on release
+                // musical rows: emit note on at press, note off at release
                 if (down)
+                {
                     noteOn(btn, midi, ch, lastPitchOpt);
+                }
                 else
+                {
                     noteOff(btn, midi, ch);
+                }
             }
         }
     }
@@ -125,32 +137,30 @@ private:
         return -1;
     }
 
-    void onControl(uint8_t c)
+    void onControl(uint8_t c, bool down)
     {
-        Serial.printf("Control %u\n", c);
+        Serial1.printf("CTL %u %s\n", c, down ? "DOWN" : "UP");
+        if (!down) return; // only on press
         switch (c)
         {
-        case 0:
-            setOctave(oct_ > 0 ? oct_ - 1 : 0);
-            break; // Z
-        case 1:
-            setOctave(oct_ < 10 ? oct_ + 1 : 10);
-            break; // X
-        case 2:
+        case 0: // Play/Pause
+            if (rl_)
+                rl_->post(AppEvent{ tx_ && tx_->isRunning() ? AppEvent::Type::Pause : AppEvent::Type::Play });
+            break;
+        case 1: // Stop
+            if (rl_) rl_->post(AppEvent{ AppEvent::Type::Stop });
+            break;
+        case 2: // Rec arm toggle
+            if (rec_) rec_->arm(!rec_->isArmed());
+            break;
+        case 5: // root-
             setRoot((root_ + 11) % 12);
-            break; // A
-        case 3:
+            break;
+        case 6: // root+
             setRoot((root_ + 1) % 12);
-            break; // S
-        case 4:
-            setVelocity(vel_ > 10 ? vel_ - 10 : 0);
-            break; // Q
-        case 5:
-            setVelocity(vel_ < 245 ? vel_ + 10 : 255);
-            break; // W
-        case 6:
-            reset();
-            break; // E
+            break;
+        case 7: // shift (reserved)
+            break;
         default:
             break;
         }
@@ -214,43 +224,43 @@ private:
 
     void noteOn(int btn, MidiIO &midi, uint8_t ch, int *lastPitchOpt)
     {
-        if (btn < 0 || btn >= BTN_MAIN)
-            return;
-        if (pressed_[btn])
-            return; // already on
         int p = btnToPitch(btn);
         if (p < 0)
             return;
+        if (pressed_[btn])
+            return; // no double-trigs
         Serial.printf("Note ON %u (btn %u) ch%u v%u\n", p, btn, ch, vel_);
         pressed_[btn] = true;
         pitch_[btn] = p;
         midi.send({ch, (uint8_t)p, vel_, true, 0});
+        if (rec_ && tx_ && tx_->isRunning() && rec_->isArmed())
+            rec_->onLiveNoteOn((uint8_t)p, vel_, tx_->playTick());
         if (lastPitchOpt)
             *lastPitchOpt = p;
     }
 
     void noteOff(int btn, MidiIO &midi, uint8_t ch)
     {
-        if (btn < 0 || btn >= BTN_MAIN)
-            return;
         if (!pressed_[btn])
-            return; // already off
-        Serial.printf("Note OFF %u (btn %u) ch%u\n", pitch_[btn], btn, ch);
-        midi.send({ch, (uint8_t)pitch_[btn], 0, false, 0});
+            return;
+        int p = pitch_[btn];
+        Serial.printf("Note OFF %u (btn %u) ch%u\n", p, btn, ch);
+        midi.send({ch, (uint8_t)p, 0, false, 0});
+        if (rec_ && tx_ && rec_->isArmed())
+            rec_->onLiveNoteOff((uint8_t)p, tx_->playTick());
         pressed_[btn] = false;
         pitch_[btn] = -1;
     }
 
-    static constexpr uint8_t ROWS = 3;
-    static constexpr uint8_t COLS = 8;
-    static constexpr uint8_t BTN_MAIN = 16;   // main keys (top+bottom)
-    static constexpr uint8_t BTN_TOTAL = 24;  // include control row
-
-    bool lastDown_[ROWS][COLS] = {};   // last read state per row/col
-    uint32_t debUntil_[BTN_TOTAL] = {}; // per-button debounce time (micros), includes control row
-    bool pressed_[BTN_MAIN] = {};      // per-button pressed state (main keys only)
-    int16_t pitch_[BTN_MAIN] = {};     // per-button pitch (or -1)
+    bool lastDown_[3][8] = {};   // last read state per row/col
+    uint32_t debUntil_[16] = {}; // per-button debounce time (micros)
+    bool pressed_[16] = {};      // per-button pressed state
+    int16_t pitch_[16] = {};     // per-button pitch (or -1)
 
     uint8_t root_{0}, oct_{4}, vel_{100};
     uint8_t bot_[8] = {}; // bottom row natural note offsets (from root)
+    // External systems
+    RunLoop *rl_{nullptr};
+    RecordEngine *rec_{nullptr};
+    Transport *tx_{nullptr};
 };

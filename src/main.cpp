@@ -9,10 +9,11 @@
 #include "core/transport.hpp"
 #include "core/midi_io.hpp"
 #include "engine/playback_engine.hpp"
+#include "engine/record_engine.hpp"
 
 #include "ui/renderer_oled.hpp"
 #include "ui/views/performance_view.hpp"
-#include "ui/cursor/serial_keyboard_input.hpp"
+#include "io/serial_monitor_input.hpp"
 
 static constexpr uint16_t PPQN = 96;
 static inline uint32_t ticksPerStep(uint16_t gridDiv) { return (uint32_t(PPQN) * 4u) / gridDiv; }
@@ -26,6 +27,8 @@ Pattern pat;
 Viewport vp;
 OledRenderer oled;
 PerformanceView perf;
+RecordEngine recorder;
+SerialMonitorInput serialIn;
 
 
 static uint16_t visibleSteps = 16; // S ∈ {1,2,4,8,16,32,64}
@@ -57,7 +60,10 @@ void setup()
   vp.tickSpan = ticksPerStep(pat.grid) * visibleSteps;
 
   runner.begin(&sched, &transport, &engine, &midi, &pat);
+  recorder.begin(&pat, &transport);
   perf.begin(pat.track.channel);
+  perf.attach(&runner, &recorder, &transport);
+  serialIn.attach(&runner, &transport, &pat, &vp, &perf);
 }
 
 void loop()
@@ -67,6 +73,8 @@ void loop()
 
   // Keyboard input
   perf.poll(midi);
+  // Serial monitor ghost controls
+  serialIn.poll(midi);
 
   // Draw
   static uint32_t nextDraw = 0;

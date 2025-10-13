@@ -60,5 +60,5 @@ Purpose: Give AI coding agents the essentials to work productively in this Teens
 - Engine: `src/engine/playback_engine.hpp`
 - Model: `src/model/{note.hpp, track.hpp, pattern.hpp, viewport.hpp}`
 - UI: `src/ui/{renderer_oled.*, views/performance_view.*, widgets/piano_roll.*}`
-- Input: `src/ui/cursor/{matrix_kb.hpp, serial_keyboard_input.hpp}`, I2C expander `src/io/pcf8575.hpp`
+- Input: `src/ui/cursor/{matrix_kb.hpp}`, I2C expander `src/io/pcf8575.hpp`
 - Entrypoint: `src/main.cpp`
