@@ -13,7 +13,11 @@ public:
         setVelocity(vel);
         reset();
     }
-    void setRoot(uint8_t r){ root_=r%12; computeBottomOffsets(); }
+    void setRoot(uint8_t r)
+    {
+        root_ = r % 12;
+        computeBottomOffsets();
+    }
     void setOctave(int8_t o)
     {
         if (o < 0)
@@ -44,7 +48,8 @@ public:
                 continue;
 
             int p = btnToPitch(btn);
-            char name[6]; pitchName((uint8_t)p, name, sizeof(name));
+            char name[6];
+            pitchName((uint8_t)p, name, sizeof(name));
 
             if (p < 0)
                 continue;
@@ -57,13 +62,14 @@ public:
                 if (lastPitchOpt)
                     *lastPitchOpt = p;
 
-                Serial.printf("NoteOn %s p%d v%u\n", name, p, vel_);
+                Serial.printf("KB: ON %s p%d v%u\n", name, p, vel_);
             }
             else
             {
                 midi.send({channel, (uint8_t)pitch_[btn], 0, false, 0});
                 pressed_[btn] = false;
                 pitch_[btn] = -1;
+                Serial.printf("KB: OFF %s (%d) ch=%u\n", name, p, channel);
             }
         }
     }
