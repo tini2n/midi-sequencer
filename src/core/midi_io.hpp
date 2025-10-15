@@ -28,6 +28,19 @@ public:
     void sendStart() { Serial1.write(0xFA); }
     void sendContinue() { Serial1.write(0xFB); }
     void sendStop() { Serial1.write(0xFC); }
+    // Send Note Off on all notes for a channel immediately
+    void allNotesOff(uint8_t ch)
+    {
+        for (uint8_t n = 0; n < 128; ++n)
+            emit(MidiEvent{ch, n, 0, false, 0});
+    }
+    // Send All Notes Off CC (123) and optionally Sound Off CC (120)
+    void sendAllNotesOffCC(uint8_t ch, bool soundOff = true)
+    {
+        uint8_t st = 0xB0 | ((ch - 1) & 0x0F);
+        Serial1.write(st); Serial1.write(123); Serial1.write(0);
+        if (soundOff) { Serial1.write(st); Serial1.write(120); Serial1.write(0); }
+    }
     // Debug helper: send note on/off immediately
     void sendNoteNow(uint8_t ch, uint8_t note, uint8_t vel, bool on)
     {

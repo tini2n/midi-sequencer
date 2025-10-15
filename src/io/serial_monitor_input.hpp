@@ -37,16 +37,13 @@ public:
             if (c == 'P' || c == 'p')
             {
                 rl_->post(AppEvent{AppEvent::Type::Play});
-                continue;
-            }
-            if (c == 'S')
-            {
-                rl_->post(AppEvent{AppEvent::Type::Stop});
+                Serial.println("Play");
                 continue;
             }
             if (c == 'R' || c == 'r')
             {
                 rl_->post(AppEvent{AppEvent::Type::Resume});
+                Serial.println("Resume");
                 continue;
             }
 
@@ -80,13 +77,36 @@ public:
                 Serial.println("PANIC sent (all notes off)\n");
                 continue;
             }
-            if (c == 'n')
-            {
-                // Debug: blip middle C
-                uint8_t ch = perf_->state().channel;
-                midi.sendNoteNow(ch, 60, 100, true);
-                midi.send(MidiEvent{ch, 60, 0, false, 200000}); // off in 200ms
+
+            // Scale and fold quick commands
+            // Two-character commands with a tolerant entry model:
+            // 1) Type both: SD / SL / S0 / SF (Enter not required)
+            // 2) Or type 'S' then 'D/L/0/F' within ~500ms (no need to press together)
+            if (c == 'S') {
+                pendingCmd_ = 'S';
+                pendingUntil_ = micros() + 500000; // 500 ms window
+                Serial.println("S- prefix: waiting for D/L/0/F...");
                 continue;
+            }
+            // If we are waiting for a suffix after 'S'
+            if (pendingCmd_ == 'S') {
+                // Timeout check
+                if ((int32_t)(micros() - pendingUntil_) >= 0) {
+                    pendingCmd_ = 0; // expired
+                } else {
+                    if (c == 'D' || c == 'd') { perf_->setScale(Scale::Dorian); perf_->setFold(false); Serial.println("Scale=Dorian"); pendingCmd_ = 0; continue; }
+                    if (c == 'L' || c == 'l') { perf_->setScale(Scale::Lydian); perf_->setFold(false); Serial.println("Scale=Lydian"); pendingCmd_ = 0; continue; }
+                    if (c == '0')            { perf_->setScale(Scale::None);   perf_->setFold(false); Serial.println("Scale=OFF");    pendingCmd_ = 0; continue; }
+                    if (c == 'F' || c == 'f') {
+                        if (perf_->state().scale != 0) {
+                            bool nf = !perf_->state().fold; perf_->setFold(nf); Serial.printf("Fold=%s\n", nf?"ON":"OFF");
+                        } else {
+                            Serial.println("Fold ignored (scale OFF)");
+                        }
+                        pendingCmd_ = 0; continue;
+                    }
+                    // Any other char -> ignore and keep waiting (until timeout)
+                }
             }
 
             // Viewport navigation (instant)
@@ -166,7 +186,7 @@ public:
                         }
                     }
                     break;
-                    case 'G':
+                    case 'G': // steps
                     {
                         uint16_t steps = (uint16_t)atoi(cmdBuf_ + 1);
                         if (steps > 0 && steps <= 256)
@@ -182,6 +202,9 @@ public:
                         }
                     }
                     break;
+                    // Description: Move playhead to specified tick position.
+                    // Note: no range check; user is responsible to provide valid tick within pattern length
+                    // (pattern length can be queried with 'G' command)
                     case 'L':
                     {
                         uint32_t t = strtoul(cmdBuf_ + 1, nullptr, 10);
@@ -228,4 +251,7 @@ private:
 
     char cmdBuf_[24]{};
     int bufLen_{0};
+    // Pending two-key command handling
+    char pendingCmd_{0};
+    uint32_t pendingUntil_{0};
 };

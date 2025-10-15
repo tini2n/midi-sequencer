@@ -8,10 +8,12 @@ void PerformanceView::draw(Pattern &pat, Viewport &vp, OledRenderer &oled, MidiI
     (void)playTick;
 
     char hud[48];
-    const char *modeStr = (st_.mode == PerformanceMode::Keyboard) ? "KB" : (st_.mode == PerformanceMode::Scale) ? "SC"
-                                                                                                                : "CHR";
-    // Simple HUD: mode, ch, octave, tempo. Transport/rec status can be shown via icons later.
-    snprintf(hud, sizeof(hud), "%s CH:%u OC:%d BP:%d", modeStr, st_.channel, st_.octave, (int)pat.tempo);
+
+    const char *scaleStr = "OFF";
+    if (st_.scale == (uint8_t)Scale::Dorian) scaleStr = "Dor";
+    else if (st_.scale == (uint8_t)Scale::Lydian) scaleStr = "Lyd";
+    // HUD: bpm, octave, scale/fold
+    snprintf(hud, sizeof(hud), "BP:%d OC:%d SC:%s%s", (int)pat.tempo, st_.octave, scaleStr, st_.fold?"*":"");
 
     PianoRoll::Options o = {};
     o.highlightPitch = st_.lastPitch;

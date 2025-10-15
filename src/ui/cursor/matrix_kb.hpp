@@ -5,6 +5,7 @@
 #include "core/runloop.hpp"
 #include "core/transport.hpp"
 #include "engine/record_engine.hpp"
+#include "model/scale.hpp"
 
 class MatrixKB
 {
@@ -44,6 +45,8 @@ public:
         oct_ = o;
     }
     void setVelocity(uint8_t v) { vel_ = v; }
+    void setScale(Scale s) { scale_ = s; }
+    void setFold(bool f) { fold_ = f; }
     void reset()
     {
         for (int i = 0; i < 16; i++)
@@ -83,13 +86,14 @@ public:
                 int btn = rowToBtn(r, c);
                 if (btn < 0)
                     continue;
-                if (now < debUntil_[btn])
+                uint32_t &deb = (r == cfg_.rowCtl) ? debCtlUntil_[c] : debUntil_[btn];
+                if (now < deb)
                     continue;
                 bool last = lastDown_[r][c];
                 if (down == last)
                     continue;
                 lastDown_[r][c] = down;
-                debUntil_[btn] = now + cfg_.debounce_us;
+                deb = now + cfg_.debounce_us;
                 if (r == cfg_.rowCtl)
                 {
                     onControl(c, down);
@@ -139,25 +143,31 @@ private:
 
     void onControl(uint8_t c, bool down)
     {
-        Serial1.printf("CTL %u %s\n", c, down ? "DOWN" : "UP");
+        // Log to USB Serial for visibility
+        Serial.printf("CTL %u %s\n", c, down ? "DOWN" : "UP");
         if (!down) return; // only on press
         switch (c)
         {
         case 0: // Play/Pause
-            if (rl_)
-                rl_->post(AppEvent{ tx_ && tx_->isRunning() ? AppEvent::Type::Pause : AppEvent::Type::Play });
+            if (rl_) {
+                bool running = tx_ && tx_->isRunning();
+                rl_->post(AppEvent{ running ? AppEvent::Type::Pause : AppEvent::Type::Play });
+                Serial.println(running ? "POST: Pause" : "POST: Play");
+            }
             break;
         case 1: // Stop
-            if (rl_) rl_->post(AppEvent{ AppEvent::Type::Stop });
+            if (rl_) { rl_->post(AppEvent{ AppEvent::Type::Stop }); Serial.println("POST: Stop"); }
             break;
         case 2: // Rec arm toggle
-            if (rec_) rec_->arm(!rec_->isArmed());
+            if (rec_) { bool newState = !rec_->isArmed(); rec_->arm(newState); Serial.printf("REC %s\n", newState ? "ARMED" : "DISARMED"); }
             break;
         case 5: // root-
             setRoot((root_ + 11) % 12);
+            Serial.printf("Root=%u\n", root_);
             break;
         case 6: // root+
             setRoot((root_ + 1) % 12);
+            Serial.printf("Root=%u\n", root_);
             break;
         case 7: // shift (reserved)
             break;
@@ -185,10 +195,27 @@ private:
     {
         int base = 12 * oct_ + root_;
 
+        // If scale folding is enabled and a scale is selected, map 0..15 to scale degrees
+        if (fold_ && scale_ != Scale::None)
+        {
+            // In fold mode, order buttons by physical rows: bottom row first, then top row.
+            // Current logical mapping: top row -> 0..7, bottom row -> 8..15.
+            // We swap them so bottom row is indices 0..7 and top row 8..15 for fold mapping.
+            uint8_t idx = (btn < 8) ? (btn + 8) : (btn - 8);
+            // Map 16 buttons across scale degrees and octaves: degrees 0..6 per octave.
+            uint8_t deg = idx % 7;       // within one octave
+            uint8_t octUp = (idx / 7);   // 0,1,2
+            uint8_t semi = scale::degreeSemitone(scale_, deg) + 12 * octUp;
+            return clamp(base + semi);
+        }
+
+        // Original natural + black-gaps mapping
         if (btn >= 8)
         {
             uint8_t k = btn - 8;
-            return clamp(base + bot_[k]);
+            int p = clamp(base + bot_[k]);
+            // Filter if a scale is selected (when not folding)
+            return (scale_ == Scale::None || scale::contains(scale_, root_, (uint8_t)p)) ? p : -1;
         } // q..i naturals
 
         if (btn == 0)
@@ -202,7 +229,10 @@ private:
         uint8_t diff = bot_[g + 1] - bot_[g];
 
         if (diff == 2)
-            return clamp(base + bot_[g] + 1); // whole-tone gap → black
+        {
+            int p = clamp(base + bot_[g] + 1); // whole-tone gap → black
+            return (scale_ == Scale::None || scale::contains(scale_, root_, (uint8_t)p)) ? p : -1;
+        }
 
         return -1;
     }
@@ -229,7 +259,7 @@ private:
             return;
         if (pressed_[btn])
             return; // no double-trigs
-        Serial.printf("Note ON %u (btn %u) ch%u v%u\n", p, btn, ch, vel_);
+        Serial.printf("Note ON %d (btn %d) ch%u v%u\n", p, btn, ch, vel_);
         pressed_[btn] = true;
         pitch_[btn] = p;
         midi.send({ch, (uint8_t)p, vel_, true, 0});
@@ -244,8 +274,16 @@ private:
         if (!pressed_[btn])
             return;
         int p = pitch_[btn];
-        Serial.printf("Note OFF %u (btn %u) ch%u\n", p, btn, ch);
-        midi.send({ch, (uint8_t)p, 0, false, 0});
+        if (p < 0 || p > 127)
+        {
+            // Guard against invalid stored pitch; skip sending malformed MIDI
+            Serial.printf("Note OFF (invalid pitch %d) (btn %d) ch%u\n", p, btn, ch);
+        }
+        else
+        {
+            Serial.printf("Note OFF %d (btn %d) ch%u\n", p, btn, ch);
+            midi.send({ch, (uint8_t)p, 0, false, 0});
+        }
         if (rec_ && tx_ && rec_->isArmed())
             rec_->onLiveNoteOff((uint8_t)p, tx_->playTick());
         pressed_[btn] = false;
@@ -253,11 +291,14 @@ private:
     }
 
     bool lastDown_[3][8] = {};   // last read state per row/col
-    uint32_t debUntil_[16] = {}; // per-button debounce time (micros)
+    uint32_t debUntil_[16] = {}; // per-button debounce time (musical buttons)
+    uint32_t debCtlUntil_[8] = {}; // debounce for control row buttons
     bool pressed_[16] = {};      // per-button pressed state
     int16_t pitch_[16] = {};     // per-button pitch (or -1)
 
     uint8_t root_{0}, oct_{4}, vel_{100};
+    Scale scale_{Scale::None};
+    bool fold_{false};
     uint8_t bot_[8] = {}; // bottom row natural note offsets (from root)
     // External systems
     RunLoop *rl_{nullptr};

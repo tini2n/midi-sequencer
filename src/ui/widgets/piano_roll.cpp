@@ -29,21 +29,22 @@ void PianoRoll::drawGrid(U8G2 &u8g2, const Viewport &v)
 
         if (step % 16 == 0) // bar
         {
-            u8g2.drawVLine(x, 0, H);
-            // u8g2.drawVLine(x + 1, 0, H);
+            // u8g2.drawVLine(x, 0, H);
+            for (int y = 0; y < H; y += 1)
+                u8g2.drawPixel(x, y);
         }
         else if (step % 4 == 0) // beat
         {
-            for (int y = 0; y < H; y += 2)
+            for (int y = 1; y < H; y += 3)
                 u8g2.drawPixel(x, y);
         }
-        else // step dots
+        else // sixteenth step dots
         {
-            u8g2.drawPixel(x, 0);
+            // Minimal hint on sixteenths: bottom end-cap dot
             u8g2.drawPixel(x, H - 1);
         }
     }
-    u8g2.drawVLine(X0 - 1, 0, H);
+    u8g2.drawVLine(X0, 0, H);
 }
 
 void PianoRoll::drawLanes(U8G2 &u8g2, const Viewport &v)

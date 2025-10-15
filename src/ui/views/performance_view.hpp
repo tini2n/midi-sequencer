@@ -14,6 +14,7 @@
 
 #include "ui/renderer_oled.hpp"
 #include "ui/cursor/matrix_kb.hpp"
+#include "model/scale.hpp"
 
 class PerformanceView
 {
@@ -43,6 +44,8 @@ public:
 
     void setRoot(uint8_t semis) { mkb_.setRoot(semis); st_.root = semis % 12; }
     void setOctave(int8_t o) { mkb_.setOctave(o); st_.octave = o; }
+    void setScale(Scale s) { mkb_.setScale(s); st_.scale = (uint8_t)s; }
+    void setFold(bool f) { mkb_.setFold(f); st_.fold = f; }
 
     PerformanceState &state() { return st_; }
     void setLastPitch(int p) { st_.lastPitch = p; }

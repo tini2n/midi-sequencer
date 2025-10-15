@@ -35,7 +35,17 @@ public:
             switch (e.type)
             {
             case AppEvent::Type::Play: tx_->resume(); midi_->sendContinue(); break;
-            case AppEvent::Type::Stop: tx_->stop(); midi_->sendStop(); break;
+            case AppEvent::Type::Stop:
+                tx_->stop();
+                // Proactively silence current pattern channel
+                if (pat_)
+                {
+                    uint8_t ch = pat_->track.channel;
+                    midi_->allNotesOff(ch);
+                    midi_->sendAllNotesOffCC(ch, true);
+                }
+                midi_->sendStop();
+                break;
             case AppEvent::Type::Pause: tx_->pause(); break;
             case AppEvent::Type::Resume: tx_->resume(); midi_->sendContinue(); break;
             }

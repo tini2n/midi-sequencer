@@ -17,4 +17,7 @@ struct PerformanceState
   uint8_t root{0};                      // 0=C … 11=B
   uint8_t  velocity{127}; 
   uint8_t  lastPitch{255};
+  // Scale filtering
+  uint8_t scale{0};     // 0=off, 1=Dorian, 2=Lydian (maps to Scale enum)
+  bool fold{false};     // When true and scale!=off → map all 16 keys to scale degrees
 };
