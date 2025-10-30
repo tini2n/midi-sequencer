@@ -51,7 +51,8 @@ void PianoRoll::drawLanes(U8G2 &u8g2, const Viewport &v)
 {
     const int H = Layout::H, LW = Layout::LABEL_W, LH = Layout::LANE_H, GX = Layout::GRID_X, GW = Layout::GRID_W;
 
-    u8g2.setFont(u8g2_font_micro_mr);
+    // u8g2.setFont(u8g2_font_minimal3x3_tu);
+    u8g2.setFont(u8g2_font_u8glib_4_tf);
     uint8_t lanes = H / LH; // ≈9
 
     uint8_t pb = v.pitchBase;
@@ -72,14 +73,16 @@ void PianoRoll::drawLanes(U8G2 &u8g2, const Viewport &v)
             u8g2.drawBox(Layout::LABEL_W - 2, y0, 2, LH);
         }
 
-        if (isBlackKey(p))
+        // Invert coloring: white keys filled, black keys not filled
+        if (!isBlackKey(p))
             u8g2.drawBox(0, y0, LW, LH);
 
         char txt[5];
         drawPitchText(p, txt);
 
-        if (isBlackKey(p))
+        if (!isBlackKey(p))
         {
+            // White key area is filled, so draw inverted text for contrast
             u8g2.setDrawColor(0);
             u8g2.drawStr(1, y0 + LH - 1, txt);
             u8g2.setDrawColor(1);

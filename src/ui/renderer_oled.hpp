@@ -18,5 +18,9 @@ public:
 
 private:
     // I2C 0x3C
-    U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_{U8G2_R0, U8X8_PIN_NONE};
+    // U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_{U8G2_R0, U8X8_PIN_NONE};
+    
+    // SSD1322 256x64, 4-wire HW SPI
+    // Pins: CS=10, DC=9, RST=8 (Teensy SCK=13, MOSI=11)
+    U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI u8g2_{U8G2_R0, /*cs=*/10, /*dc=*/9, /*rst=*/8};
 };

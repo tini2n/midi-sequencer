@@ -6,6 +6,7 @@
 #include "config.hpp"
 
 #include "ui/performance_state.hpp"
+#include "ui/views/base_view.hpp"
 
 #include "core/midi_io.hpp"
 
@@ -16,10 +17,11 @@
 #include "ui/cursor/matrix_kb.hpp"
 #include "model/scale.hpp"
 
-class PerformanceView
+class PerformanceView : public IView
 {
 public:
-    void begin(uint8_t midiCh)
+    // IView interface implementation
+    void begin(uint8_t midiCh) override
     {
         st_.channel = midiCh;
         st_.root = 0;
@@ -28,12 +30,18 @@ public:
         config.address = cfg::PCF_ADDRESS;
         mkb_.begin(config, 0, 4, 100);
     }
-    void attach(class RunLoop* rl, class RecordEngine* re, class Transport* tx)
+    
+    void attach(RunLoop* rl, RecordEngine* re, Transport* tx, class ViewManager* vm = nullptr) override
     {
         mkb_.attach(rl, re, tx);
+        if (vm != nullptr) {
+            mkb_.attachViewManager(vm);
+        }
     }
-    void draw(Pattern &pat, Viewport &vp, OledRenderer &oled, MidiIO &midi, uint32_t now, uint32_t playTick);
-    void poll(MidiIO &midi)
+    
+    void draw(Pattern &pat, Viewport &vp, OledRenderer &oled, MidiIO &midi, uint32_t now, uint32_t playTick) override;
+    
+    void poll(MidiIO &midi) override
     {
         int last = -1;
         mkb_.poll(midi, st_.channel, &last);
@@ -41,7 +49,10 @@ public:
         if (last >= 0)
             st_.lastPitch = last;
     }
+    
+    const char* getName() const override { return "Performance"; }
 
+    // Performance-specific methods
     void setRoot(uint8_t semis) { mkb_.setRoot(semis); st_.root = semis % 12; }
     void setOctave(int8_t o) { mkb_.setOctave(o); st_.octave = o; }
     void setScale(Scale s) { mkb_.setScale(s); st_.scale = (uint8_t)s; }

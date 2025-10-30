@@ -4,7 +4,7 @@
 
 struct Viewport
 {
-    static constexpr int16_t W = 128, H = 64;
+    static constexpr int16_t W = 256, H = 64;
 
     uint32_t tickStart{0}, tickSpan{2048};
     uint8_t pitchBase{12}, grid{16};

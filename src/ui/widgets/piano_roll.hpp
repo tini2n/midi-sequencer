@@ -7,7 +7,8 @@ struct PianoRoll
 {
     struct Layout
     {
-        static constexpr uint8_t W = 128, H = 64, LABEL_W = 14, GRID_X = 14, GRID_W = 114, LANE_H = 7;
+        static constexpr uint16_t W = 256;
+        static constexpr uint8_t H = 64, LABEL_W = 14, GRID_X = 14, GRID_W = 242, LANE_H = 6;
     };
     struct Options
     {

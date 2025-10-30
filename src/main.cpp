@@ -12,7 +12,9 @@
 #include "engine/record_engine.hpp"
 
 #include "ui/renderer_oled.hpp"
+#include "ui/views/view_manager.hpp"
 #include "ui/views/performance_view.hpp"
+#include "ui/views/generative_view.hpp"
 #include "io/serial_monitor_input.hpp"
 
 static constexpr uint16_t PPQN = 96;
@@ -26,7 +28,9 @@ RunLoop runner;
 Pattern pat;
 Viewport vp;
 OledRenderer oled;
-PerformanceView perf;
+ViewManager viewManager;
+PerformanceView performanceView;
+GenerativeView generativeView;
 RecordEngine recorder;
 SerialMonitorInput serialIn;
 
@@ -41,6 +45,8 @@ void setup()
   }
 
   Serial.println("MIDI Sequencer. Initing...");
+  Serial.println("View system: Performance (default) and Generative modes");
+  Serial.println("Switch views: Control button 6");
 
   oled.begin();
   midi.begin();
@@ -61,9 +67,14 @@ void setup()
 
   runner.begin(&sched, &transport, &engine, &midi, &pat);
   recorder.begin(&pat, &transport);
-  perf.begin(pat.track.channel);
-  perf.attach(&runner, &recorder, &transport);
-  serialIn.attach(&runner, &transport, &pat, &vp, &perf);
+  
+  // Initialize views
+  viewManager.registerView(ViewType::Performance, &performanceView);
+  viewManager.registerView(ViewType::Generative, &generativeView);
+  viewManager.beginAll(pat.track.channel);
+  viewManager.attachAll(&runner, &recorder, &transport); // Now includes ViewManager attachment
+  
+  serialIn.attach(&runner, &transport, &pat, &vp, &viewManager, &performanceView);
 }
 
 void loop()
@@ -71,8 +82,8 @@ void loop()
   // Run clock & transport and generate events
   runner.service();
 
-  // Keyboard input
-  perf.poll(midi);
+  // UI input and rendering
+  viewManager.poll(midi);
   // Serial monitor ghost controls
   serialIn.poll(midi);
 
@@ -81,8 +92,7 @@ void loop()
   uint32_t now = micros();
   if ((int32_t)(now - nextDraw) >= 0)
   {
-
-    perf.draw(pat, vp, oled, midi, now, transport.playTick());
+    viewManager.draw(pat, vp, oled, midi, now, transport.playTick());
     nextDraw = now + 50000; // 20 FPS
   }
 }

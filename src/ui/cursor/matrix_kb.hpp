@@ -65,6 +65,12 @@ public:
         tx_ = tx;
     }
 
+    // Attach view manager for view switching controls
+    void attachViewManager(class ViewManager *vm)
+    {
+        vm_ = vm;
+    }
+
     void poll(MidiIO &midi, uint8_t ch, int *lastPitchOpt = nullptr)
     {
         uint32_t now = micros();
@@ -141,40 +147,7 @@ private:
         return -1;
     }
 
-    void onControl(uint8_t c, bool down)
-    {
-        // Log to USB Serial for visibility
-        Serial.printf("CTL %u %s\n", c, down ? "DOWN" : "UP");
-        if (!down) return; // only on press
-        switch (c)
-        {
-        case 0: // Play/Pause
-            if (rl_) {
-                bool running = tx_ && tx_->isRunning();
-                rl_->post(AppEvent{ running ? AppEvent::Type::Pause : AppEvent::Type::Play });
-                Serial.println(running ? "POST: Pause" : "POST: Play");
-            }
-            break;
-        case 1: // Stop
-            if (rl_) { rl_->post(AppEvent{ AppEvent::Type::Stop }); Serial.println("POST: Stop"); }
-            break;
-        case 2: // Rec arm toggle
-            if (rec_) { bool newState = !rec_->isArmed(); rec_->arm(newState); Serial.printf("REC %s\n", newState ? "ARMED" : "DISARMED"); }
-            break;
-        case 5: // root-
-            setRoot((root_ + 11) % 12);
-            Serial.printf("Root=%u\n", root_);
-            break;
-        case 6: // root+
-            setRoot((root_ + 1) % 12);
-            Serial.printf("Root=%u\n", root_);
-            break;
-        case 7: // shift (reserved)
-            break;
-        default:
-            break;
-        }
-    }
+    void onControl(uint8_t c, bool down);
 
     void computeBottomOffsets()
     {
@@ -304,4 +277,5 @@ private:
     RunLoop *rl_{nullptr};
     RecordEngine *rec_{nullptr};
     Transport *tx_{nullptr};
+    class ViewManager *vm_{nullptr};
 };

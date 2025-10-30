@@ -5,9 +5,12 @@
 #include "core/runloop.hpp"
 #include "core/transport.hpp"
 #include "core/midi_io.hpp"
+#include "core/timebase.hpp"
 #include "model/pattern.hpp"
 #include "model/viewport.hpp"
 #include "ui/views/performance_view.hpp"
+#include "ui/views/generative_view.hpp"
+#include "ui/views/view_manager.hpp"
 
 // Lightweight Serial Monitor input for ghost control during development.
 // Reads single-key commands and simple line commands from USB Serial.
@@ -15,40 +18,94 @@
 class SerialMonitorInput
 {
 public:
-    void attach(RunLoop *rl, Transport *tx, Pattern *pat, Viewport *vp, PerformanceView *perf)
+    void attach(RunLoop *rl, Transport *tx, Pattern *pat, Viewport *vp, ViewManager *vm, PerformanceView *perf)
     {
         rl_ = rl;
         tx_ = tx;
         pat_ = pat;
         vp_ = vp;
+        vm_ = vm;
         perf_ = perf;
     }
 
     void poll(MidiIO &midi)
     {
-        if (!rl_ || !tx_ || !pat_ || !vp_ || !perf_)
+        if (!rl_ || !tx_ || !pat_ || !vp_ || !vm_ || !perf_)
             return;
 
         while (Serial.available())
         {
             char c = (char)Serial.read();
 
-            // Transport (instant, via RunLoop events)
-            if (c == 'P' || c == 'p')
+            // Generative commands (when in generative view)
+            if (vm_->getCurrentViewType() == ViewType::Generative)
             {
-                rl_->post(AppEvent{AppEvent::Type::Play});
-                Serial.println("Play");
-                continue;
-            }
-            if (c == 'R' || c == 'r')
-            {
-                rl_->post(AppEvent{AppEvent::Type::Resume});
-                Serial.println("Resume");
-                continue;
+                if (c == 'g' || c == 'G')
+                {
+                    // Generate pattern
+                    GenerativeView *genView = static_cast<GenerativeView *>(vm_->getCurrentView());
+                    if (genView)
+                    {
+                        genView->triggerGeneration(*pat_);
+                        Serial.println("Pattern generated");
+                    }
+                    continue;
+                }
+                if (c == 'n' || c == 'N')
+                {
+                    // Next generator
+                    GenerativeView *genView = static_cast<GenerativeView *>(vm_->getCurrentView());
+                    if (genView)
+                    {
+                        genView->switchToNextGenerator();
+                    }
+                    continue;
+                }
+                if (c == 'b' || c == 'B')
+                {
+                    // Previous generator (back)
+                    GenerativeView *genView = static_cast<GenerativeView *>(vm_->getCurrentView());
+                    if (genView)
+                    {
+                        genView->switchToPreviousGenerator();
+                    }
+                    continue;
+                }
+                if (c == 'l' || c == 'L')
+                {
+                    // List generators
+                    GenerativeView *genView = static_cast<GenerativeView *>(vm_->getCurrentView());
+                    if (genView)
+                    {
+                        genView->getGeneratorManager().printAvailableGenerators();
+                    }
+                    continue;
+                }
+                if (c == 'i' || c == 'I')
+                {
+                    // Generator info
+                    GenerativeView *genView = static_cast<GenerativeView *>(vm_->getCurrentView());
+                    if (genView)
+                    {
+                        genView->getGeneratorManager().printCurrentGenerator();
+                    }
+                    continue;
+                }
+                if (c == 'r' || c == 'R')
+                {
+                    // Reset to defaults
+                    GenerativeView *genView = static_cast<GenerativeView *>(vm_->getCurrentView());
+                    if (genView)
+                    {
+                        genView->resetToDefaults();
+                        Serial.println("Reset generator to defaults");
+                    }
+                    continue;
+                }
             }
 
-            // Quick utilities
-            if (c == '+' || c == '=')
+            // Quick utilities - Octave and Root controls
+            if (c == '+')
             {
                 // octave up
                 int8_t o = perf_->state().octave;
@@ -58,7 +115,7 @@ public:
                 Serial.printf("Octave %d\n", (int)o);
                 continue;
             }
-            if (c == '-' || c == '_')
+            if (c == '-')
             {
                 // octave down
                 int8_t o = perf_->state().octave;
@@ -66,6 +123,30 @@ public:
                     o--;
                 perf_->setOctave(o);
                 Serial.printf("Octave %d\n", (int)o);
+                continue;
+            }
+            if (c == '=')
+            {
+                // root up
+                int8_t r = perf_->state().root;
+                if (r < 11)
+                    r++;
+                else
+                    r = 0; // wrap around
+                perf_->setRoot(r);
+                Serial.printf("Root %d\n", (int)r);
+                continue;
+            }
+            if (c == '_')
+            {
+                // root down
+                int8_t r = perf_->state().root;
+                if (r > 0)
+                    r--;
+                else
+                    r = 11; // wrap around
+                perf_->setRoot(r);
+                Serial.printf("Root %d\n", (int)r);
                 continue;
             }
             if (c == ';')
@@ -82,28 +163,63 @@ public:
             // Two-character commands with a tolerant entry model:
             // 1) Type both: SD / SL / S0 / SF (Enter not required)
             // 2) Or type 'S' then 'D/L/0/F' within ~500ms (no need to press together)
-            if (c == 'S') {
+            // Note: In generative view, 'S' followed by Enter will be handled as parameter setting
+            // Only handle 'S' scale/fold prefix in Performance view
+            if (c == 'S' && vm_->getCurrentViewType() == ViewType::Performance)
+            {
                 pendingCmd_ = 'S';
                 pendingUntil_ = micros() + 500000; // 500 ms window
                 Serial.println("S- prefix: waiting for D/L/0/F...");
                 continue;
             }
             // If we are waiting for a suffix after 'S'
-            if (pendingCmd_ == 'S') {
+            if (pendingCmd_ == 'S')
+            {
                 // Timeout check
-                if ((int32_t)(micros() - pendingUntil_) >= 0) {
+                if ((int32_t)(micros() - pendingUntil_) >= 0)
+                {
                     pendingCmd_ = 0; // expired
-                } else {
-                    if (c == 'D' || c == 'd') { perf_->setScale(Scale::Dorian); perf_->setFold(false); Serial.println("Scale=Dorian"); pendingCmd_ = 0; continue; }
-                    if (c == 'L' || c == 'l') { perf_->setScale(Scale::Lydian); perf_->setFold(false); Serial.println("Scale=Lydian"); pendingCmd_ = 0; continue; }
-                    if (c == '0')            { perf_->setScale(Scale::None);   perf_->setFold(false); Serial.println("Scale=OFF");    pendingCmd_ = 0; continue; }
-                    if (c == 'F' || c == 'f') {
-                        if (perf_->state().scale != 0) {
-                            bool nf = !perf_->state().fold; perf_->setFold(nf); Serial.printf("Fold=%s\n", nf?"ON":"OFF");
-                        } else {
+                }
+                else
+                {
+                    if (c == 'D' || c == 'd')
+                    {
+                        perf_->setScale(Scale::Dorian);
+                        perf_->setFold(false);
+                        Serial.println("Scale=Dorian");
+                        pendingCmd_ = 0;
+                        continue;
+                    }
+                    if (c == 'L' || c == 'l')
+                    {
+                        perf_->setScale(Scale::Lydian);
+                        perf_->setFold(false);
+                        Serial.println("Scale=Lydian");
+                        pendingCmd_ = 0;
+                        continue;
+                    }
+                    if (c == '0')
+                    {
+                        perf_->setScale(Scale::None);
+                        perf_->setFold(false);
+                        Serial.println("Scale=OFF");
+                        pendingCmd_ = 0;
+                        continue;
+                    }
+                    if (c == 'F' || c == 'f')
+                    {
+                        if (perf_->state().scale != 0)
+                        {
+                            bool nf = !perf_->state().fold;
+                            perf_->setFold(nf);
+                            Serial.printf("Fold=%s\n", nf ? "ON" : "OFF");
+                        }
+                        else
+                        {
                             Serial.println("Fold ignored (scale OFF)");
                         }
-                        pendingCmd_ = 0; continue;
+                        pendingCmd_ = 0;
+                        continue;
                     }
                     // Any other char -> ignore and keep waiting (until timeout)
                 }
@@ -131,16 +247,16 @@ public:
             case 's':
                 vp_->zoom_ticks(0.5f, pat_->ticks());
                 continue;
-            case 'z':
+            case 'q':
                 vp_->pan_pitch(-1);
                 continue;
-            case 'x':
+            case 'e':
                 vp_->pan_pitch(+1);
                 continue;
-            case 'Z':
+            case 'Q':
                 vp_->pan_pitch(-12);
                 continue;
-            case 'X':
+            case 'E':
                 vp_->pan_pitch(+12);
                 continue;
             default:
@@ -212,6 +328,56 @@ public:
                         Serial.printf("Locate=%lu\n", (unsigned long)t);
                     }
                     break;
+                    case 'P':
+                    {
+                        // Handle "set param value" commands for generative view
+                        // Format: P<paramname> <value>
+                        // Examples:
+                        //   Pdensity 80    - Set density parameter to 80
+                        //   Plength 16     - Set pattern length to 16 steps
+                        //   Pvelocity 100  - Set base velocity to 100
+                        //   Pvel_range 20  - Set velocity variation to ±20
+                        //   Ppitch_range 12 - Set pitch variation to ±12 semitones
+                        //   Pbase_note 60  - Set base MIDI note to 60 (C4)
+                        //   Pduration 0.5  - Set note duration to 50% of step
+                        if (vm_->getCurrentViewType() == ViewType::Generative)
+                        {
+                            GenerativeView *genView = static_cast<GenerativeView *>(vm_->getCurrentView());
+                            if (genView)
+                            {
+                                // Parse "P<paramname> <value>" format
+                                String cmd(cmdBuf_);
+                                int spaceIndex = cmd.indexOf(' ');
+                                if (spaceIndex > 1)
+                                {
+                                    String paramName = cmd.substring(1, spaceIndex);
+                                    float value = cmd.substring(spaceIndex + 1).toFloat();
+
+                                    if (genView->getGeneratorManager().setParameter(paramName.c_str(), value))
+                                    {
+                                        Serial.printf("Set %s = %.2f\n", paramName.c_str(), value);
+                                    }
+                                    else
+                                    {
+                                        Serial.printf("Unknown parameter: %s\n", paramName.c_str());
+                                        Serial.println("Use 'i' to see available parameters");
+                                    }
+                                }
+                                else
+                                {
+                                    Serial.println("Usage: P<param> <value>");
+                                    Serial.println("Examples: Pdensity 80, Plength 16, Pvelocity 100");
+                                    Serial.println("Use 'i' command to see all available parameters");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            Serial.println("Parameter setting only works in Generative view");
+                            Serial.println("Switch to Generative view first (Matrix KB buttons 3/4/6)");
+                        }
+                    }
+                    break;
                     default:
                         Serial.println("ERR unknown cmd");
                         break;
@@ -224,10 +390,11 @@ public:
             // Start/append numeric command buffer
             if (bufLen_ == 0)
             {
-                if (c == 'T' || c == 'C' || c == 'G' || c == 'L')
+                if (c == 'T' || c == 'C' || c == 'G' || c == 'L' || c == 'S' || c == 'P')
                     cmdBuf_[bufLen_++] = c;
             }
-            else if (isDigit_(c) || c == '.' || c == '-' || c == ' ')
+            else if (isDigit_(c) || c == '.' || c == '-' || c == ' ' ||
+                     (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')
             {
                 if (bufLen_ < (int)sizeof(cmdBuf_) - 1)
                     cmdBuf_[bufLen_++] = c;
@@ -243,10 +410,13 @@ public:
 private:
     static bool isDigit_(char c) { return c >= '0' && c <= '9'; }
 
+    // Handle generative view commands
+
     RunLoop *rl_{nullptr};
     Transport *tx_{nullptr};
     Pattern *pat_{nullptr};
     Viewport *vp_{nullptr};
+    ViewManager *vm_{nullptr};
     PerformanceView *perf_{nullptr};
 
     char cmdBuf_[24]{};
