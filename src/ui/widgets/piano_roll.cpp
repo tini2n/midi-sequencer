@@ -29,7 +29,6 @@ void PianoRoll::drawGrid(U8G2 &u8g2, const Viewport &v)
 
         if (step % 16 == 0) // bar
         {
-            // u8g2.drawVLine(x, 0, H);
             for (int y = 0; y < H; y += 1)
                 u8g2.drawPixel(x, y);
         }
@@ -38,11 +37,11 @@ void PianoRoll::drawGrid(U8G2 &u8g2, const Viewport &v)
             for (int y = 1; y < H; y += 3)
                 u8g2.drawPixel(x, y);
         }
-        else // sixteenth step dots
-        {
-            // Minimal hint on sixteenths: bottom end-cap dot
-            u8g2.drawPixel(x, H - 1);
-        }
+        // else // sixteenth step dots
+        // {
+        //     // Minimal hint on sixteenths: bottom end-cap dot
+        //     u8g2.drawPixel(x, H - 1);
+        // }
     }
     u8g2.drawVLine(X0, 0, H);
 }
@@ -85,13 +84,13 @@ void PianoRoll::drawLanes(U8G2 &u8g2, const Viewport &v)
             // White key area is filled, so draw inverted text for contrast
             u8g2.setDrawColor(0);
             u8g2.drawStr(1, y0 + LH - 1, txt);
-            u8g2.setDrawColor(1);
+            u8g2.setDrawColor(255);
         }
         else
             u8g2.drawStr(1, y0 + LH - 1, txt);
 
         // if (row > 0)
-        u8g2.drawHLine(GX, y0, GW);
+        // u8g2.drawHLine(GX, y0, GW);
     }
 }
 

@@ -60,7 +60,7 @@ void setup()
   transport.setLoopLen(pat.ticks());
   transport.setTempo(pat.tempo);
   transport.locate(0);
-  transport.start();
+  // transport.start();
 
   vp.pitchBase = 36;
   vp.tickSpan = ticksPerStep(pat.grid) * visibleSteps;

@@ -42,6 +42,20 @@ private:
             u8g2.drawVLine(xx, y, h);
     }
 
+    // Gray line drawing helpers
+    inline void drawGrayVLine(U8G2 &u8g2, int x, int y, int h, uint8_t grayLevel)
+    {
+        u8g2.setDrawColor(grayLevel);
+        u8g2.drawVLine(x, y, h);
+        u8g2.setDrawColor(255); // Reset to white
+    }
+    inline void drawGrayHLine(U8G2 &u8g2, int x, int y, int w, uint8_t grayLevel)
+    {
+        u8g2.setDrawColor(grayLevel);
+        u8g2.drawHLine(x, y, w);
+        u8g2.setDrawColor(255); // Reset to white
+    }
+
     // Pitch rendering helpers
     static bool isBlackKey(uint8_t midi)
     {
