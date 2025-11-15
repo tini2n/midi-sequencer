@@ -109,6 +109,37 @@ void ViewManager::poll(MidiIO& midi)
     if (currentView_ != nullptr) {
         currentView_->poll(midi);
     }
+    
+    // Poll encoders if initialized
+    if (encodersInitialized_) {
+        pollEncoders();
+    }
+}
+
+void ViewManager::beginEncoders(const EncoderManager::PinConfig configs[EncoderManager::NUM_ENCODERS], 
+                                uint32_t debounceUs)
+{
+    encoderMgr_.begin(configs, debounceUs);
+    encodersInitialized_ = true;
+    Serial.println("Encoder manager initialized");
+}
+
+void ViewManager::pollEncoders()
+{
+    // Set current view as handler based on view type
+    // Both PerformanceView and GenerativeView implement IEncoderHandler
+    IEncoderHandler* handler = nullptr;
+    
+    if (currentViewType_ == ViewType::Performance) {
+        handler = static_cast<PerformanceView*>(currentView_);
+    } else if (currentViewType_ == ViewType::Generative) {
+        handler = static_cast<GenerativeView*>(currentView_);
+    }
+    
+    encoderMgr_.setHandler(handler);
+    
+    // Poll encoders (will dispatch to current handler)
+    encoderMgr_.poll();
 }
 
 const char* ViewManager::getCurrentViewName() const

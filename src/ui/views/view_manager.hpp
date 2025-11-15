@@ -3,6 +3,7 @@
 #include <array>
 
 #include "base_view.hpp"
+#include "io/encoder_manager.hpp"
 
 /**
  * Manages multiple views and handles switching between them.
@@ -73,6 +74,19 @@ public:
      */
     void poll(MidiIO& midi);
 
+    /**
+     * Initialize encoder manager with pin configuration.
+     * @param configs Array of 8 encoder pin configurations
+     * @param debounceUs Debounce time in microseconds (default 5000)
+     */
+    void beginEncoders(const EncoderManager::PinConfig configs[EncoderManager::NUM_ENCODERS], 
+                       uint32_t debounceUs = 5000);
+
+    /**
+     * Poll encoders and dispatch to current view.
+     * Called automatically by poll().
+     */
+    void pollEncoders();
 
     /**
      * Get name of current view for display.
@@ -83,6 +97,8 @@ private:
     std::array<IView*, static_cast<size_t>(ViewType::Count)> views_{};
     ViewType currentViewType_{ViewType::Performance};
     IView* currentView_{nullptr};
+    EncoderManager encoderMgr_{};
+    bool encodersInitialized_{false};
 
     void activateView(ViewType viewType);
 };

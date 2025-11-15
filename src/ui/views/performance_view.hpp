@@ -16,8 +16,9 @@
 #include "ui/renderer_oled.hpp"
 #include "ui/cursor/matrix_kb.hpp"
 #include "model/scale.hpp"
+#include "io/encoder_manager.hpp"
 
-class PerformanceView : public IView
+class PerformanceView : public IView, public IEncoderHandler
 {
 public:
     // IView interface implementation
@@ -60,6 +61,10 @@ public:
 
     PerformanceState &state() { return st_; }
     void setLastPitch(int p) { st_.lastPitch = p; }
+    
+    // IEncoderHandler interface
+    void onEncoderRotation(const EncoderRotationEvent& event) override;
+    void onEncoderButton(const EncoderButtonEvent& event) override;
 
 private:
     PerformanceState st_{};

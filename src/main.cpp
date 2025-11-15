@@ -16,9 +16,30 @@
 #include "ui/views/performance_view.hpp"
 #include "ui/views/generative_view.hpp"
 #include "io/serial_monitor_input.hpp"
+#include "io/encoder_manager.hpp"
 
 static constexpr uint16_t PPQN = 96;
 static inline uint32_t ticksPerStep(uint16_t gridDiv) { return (uint32_t(PPQN) * 4u) / gridDiv; }
+
+// Encoder pin configuration
+// ENC1: A=2,  B=3,  SW=0
+// ENC2: A=4,  B=5,  SW=12
+// ENC3: A=6,  B=7,  SW=26
+// ENC4: A=14, B=15, SW=27
+// ENC5: A=16, B=17, SW=28
+// ENC6: A=20, B=21, SW=29
+// ENC7: A=22, B=23, SW=30
+// ENC8: A=24, B=25, SW=31
+const EncoderManager::PinConfig ENCODER_PINS[8] = {
+    {2,  3,  0},   // ENC1
+    {4,  5,  12},  // ENC2
+    {6,  7,  26},  // ENC3
+    {14, 15, 27},  // ENC4
+    {16, 17, 28},  // ENC5
+    {20, 21, 29},  // ENC6
+    {22, 23, 30},  // ENC7
+    {24, 25, 31}   // ENC8
+};
 
 TickScheduler sched;
 Transport transport;
@@ -73,6 +94,12 @@ void setup()
   viewManager.registerView(ViewType::Generative, &generativeView);
   viewManager.beginAll(pat.track.channel);
   viewManager.attachAll(&runner, &recorder, &transport); // Now includes ViewManager attachment
+  
+  // Initialize encoders
+  viewManager.beginEncoders(ENCODER_PINS, cfg::ENCODER_DEBOUNCE_US);
+  Serial.println("Encoders initialized:");
+  Serial.println("  ENC1 (Root/Density) - ENC2 (Octave/Length) - ENC3 (Scale/BaseNote)");
+  Serial.println("  ENC4 (Switch Gen) - ENC5-8 (Reserved)");
   
   serialIn.attach(&runner, &transport, &pat, &vp, &viewManager, &performanceView);
 }
