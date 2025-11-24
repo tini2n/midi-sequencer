@@ -1,6 +1,10 @@
 #pragma once
 #include <Arduino.h>
 
+#include "ui/views/base_view.hpp"
+#include "io/matrix_kb.hpp"
+#include "engine/generator_manager.hpp"
+#include "io/encoder_manager.hpp"
 #include "config.hpp"
 
 #include "engine/generator_manager.hpp"

@@ -1,76 +1,48 @@
 #include "matrix_kb.hpp"
 #include "ui/views/view_manager.hpp"
 
-// Control row mapping:
-// 0: Rec arm toggle (or Shift+Rec = Clear in cursor mode)
-// 1: Play/Pause (or Shift+Play = Copy in cursor mode)
-// 2: Stop (or Shift+Stop = Paste in cursor mode)
+// 0: Rec arm toggle (was Play/Pause)
+// 1: Play/Pause (was Rec arm toggle)
+// 2: Stop (was Rec arm toggle)
 // 3: (unused)
 // 4: (unused)
 // 5: (unused)
 // 6: Switch to next view
-// 7: Shift modifier
+// 7: Shift (reserved)
+
 
 void MatrixKB::onControl(uint8_t c, bool down)
 {
     // Log to USB Serial for visibility
     Serial.printf("CTL %u %s\n", c, down ? "DOWN" : "UP");
-
-    // Handle Shift button state (Ctl 7)
-    if (c == 7)
-    {
-        cursorMode_.setShiftPressed(down);
-        Serial.printf("SHIFT %s\n", down ? "DOWN" : "UP");
-        return;
-    }
-
     if (!down)
-        return; // only on press for other controls
-
-    // Check if shift is pressed for copy/paste/clear operations
-    bool shiftPressed = cursorMode_.isShiftPressed();
-    bool isCursorMode = (mode_ == Mode::Cursor);
-
+        return; // only on press
     switch (c)
     {
-    case 0: // Rec arm toggle OR Shift+Rec = Clear step (cursor mode only)
-        if (shiftPressed && isCursorMode && pattern_)
-        {
-            cursorMode_.clearStep(*pattern_);
-        }
-        else if (rec_)
+    case 0: // Rec arm toggle
+        if (rec_)
         {
             bool newState = !rec_->isArmed();
             rec_->arm(newState);
             Serial.printf("REC %s\n", newState ? "ARMED" : "DISARMED");
         }
         break;
-
-    case 1: // Play/Pause OR Shift+Play = Copy step (cursor mode only)
-        if (shiftPressed && isCursorMode && pattern_)
-        {
-            cursorMode_.copyStep(*pattern_);
-        }
-        else if (rl_)
+    case 1: // Play/Pause
+        if (rl_)
         {
             bool running = tx_ && tx_->isRunning();
             rl_->post(AppEvent{running ? AppEvent::Type::Pause : AppEvent::Type::Play});
             Serial.println(running ? "POST: Pause" : "POST: Play");
         }
-        break;
 
-    case 2: // Stop OR Shift+Stop = Paste step (cursor mode only)
-        if (shiftPressed && isCursorMode && pattern_)
-        {
-            cursorMode_.pasteToStep(*pattern_);
-        }
-        else if (rl_)
+        break;
+    case 2: // Stop
+        if (rl_)
         {
             rl_->post(AppEvent{AppEvent::Type::Stop});
             Serial.println("POST: Stop");
         }
         break;
-
     case 3:
         break;
     case 4:
@@ -82,6 +54,8 @@ void MatrixKB::onControl(uint8_t c, bool down)
         {
             vm_->switchToNextView();
         }
+        break;
+    case 7: // shift (reserved)
         break;
     default:
         break;
