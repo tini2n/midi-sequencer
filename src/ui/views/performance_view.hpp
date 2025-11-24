@@ -14,7 +14,7 @@
 #include "model/viewport.hpp"
 
 #include "ui/renderer_oled.hpp"
-#include "ui/cursor/matrix_kb.hpp"
+#include "io/matrix_kb.hpp"
 #include "model/scale.hpp"
 #include "io/encoder_manager.hpp"
 
