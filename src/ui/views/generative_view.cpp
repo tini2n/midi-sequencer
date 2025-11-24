@@ -33,16 +33,19 @@ void GenerativeView::onEncoderRotation(const EncoderRotationEvent& event)
             }
             break;
         }
-        case 2: // ENC3: Base note parameter
+        case 2: // ENC3: Edit pitch for cursor mode
         {
+            // Control cursor mode edit pitch
+            int newPitch = (int)mkb_.getCursorMode().getEditPitch() + event.delta;
+            if (newPitch < 0) newPitch = 0;
+            if (newPitch > 127) newPitch = 127;
+            mkb_.getCursorMode().setEditPitch((uint8_t)newPitch);
+            
+            // Also update generator base_note for convenience
             float baseNote = 0;
             if (gen->getParameter("base_note", baseNote))
             {
-                baseNote += event.delta;
-                if (baseNote < 0) baseNote = 0;
-                if (baseNote > 127) baseNote = 127;
-                generatorManager_.setParameter("base_note", baseNote);
-                Serial.printf("[GenerativeView] ENC3 Base Note: %.0f\n", baseNote);
+                generatorManager_.setParameter("base_note", (float)newPitch);
             }
             break;
         }
@@ -103,6 +106,9 @@ void GenerativeView::begin(uint8_t midiChannel)
     config.address = cfg::PCF_ADDRESS;
     mkb_.begin(config, 0, 4, 100);
     
+    // Set to cursor mode for generative view
+    mkb_.setMode(MatrixKB::Mode::Cursor);
+    
     // Initialize generator manager
     generatorManager_.begin();
     
@@ -125,20 +131,17 @@ void GenerativeView::draw(Pattern& pattern, Viewport& viewport, OledRenderer& ol
 {
     (void)midi;
     
+    // Update pattern reference for cursor mode (in case it changed)
+    mkb_.setPattern(&pattern);
+    
     // Create HUD string for generative view
     char hud[64];
     drawHUD(hud, sizeof(hud));
     
     // Use the piano roll for pattern visualization
     PianoRoll::Options options = {};
-    // Highlight the base note from current generator
-    Generator* gen = generatorManager_.getCurrentGenerator();
-    if (gen) {
-        float baseNote;
-        if (gen->getParameter("base_note", baseNote)) {
-            options.highlightPitch = (uint8_t)baseNote;
-        }
-    }
+    // Highlight the edit pitch from cursor mode
+    options.highlightPitch = mkb_.getCursorMode().getEditPitch();
     
     oled.rollSetOptions(options);
     oled.drawFrame(pattern, viewport, now, playTick, hud);
@@ -146,18 +149,15 @@ void GenerativeView::draw(Pattern& pattern, Viewport& viewport, OledRenderer& ol
 
 void GenerativeView::poll(MidiIO& midi)
 {
-    int lastPitch = -1;
-    mkb_.poll(midi, midiChannel_, &lastPitch);
-    
-    // TODO: In the future, we can use the matrix keyboard for:
-    // - Triggering generation
-    // - Adjusting parameters 
-    // - Switching between generators
-    // For now, we rely on serial commands for parameter control
+    // Matrix keyboard now acts as step sequencer cursor in this view
+    mkb_.poll(midi, midiChannel_, nullptr);
 }
 
 void GenerativeView::onActivate()
 {
+    // Switch to cursor mode
+    mkb_.setMode(MatrixKB::Mode::Cursor);
+    
     Serial.println("=== GenerativeView Activated ===");
     Serial.println("Serial Commands:");
     Serial.println("  'g' - Generate pattern");
@@ -168,10 +168,15 @@ void GenerativeView::onActivate()
     Serial.println("  'r' - Reset to defaults");
     Serial.println("  'S<param> <value>' - Set parameter");
     Serial.println("    Examples: Sdensity 80, Slength 16");
-    Serial.println("Matrix KB:");
-    Serial.println("  Buttons 3/4/6 - Switch views");
+    Serial.println("Matrix KB (Cursor Mode):");
+    Serial.println("  Buttons 0-15 - Select step + toggle note");
+    Serial.println("  ENC3 - Edit pitch");
+    Serial.println("  Shift + Rec - Clear step");
+    Serial.println("  Shift + Play - Copy step");
+    Serial.println("  Shift + Stop - Paste step");
     Serial.println("  Button 1 - Play/Pause");
     Serial.println("  Button 2 - Stop");
+    Serial.println("  Button 6 - Switch views");
     Serial.println("================================");
     
     generatorManager_.printCurrentGenerator();

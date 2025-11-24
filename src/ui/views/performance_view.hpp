@@ -7,15 +7,15 @@
 
 #include "ui/performance_state.hpp"
 #include "ui/views/base_view.hpp"
+#include "ui/renderer_oled.hpp"
 
 #include "core/midi_io.hpp"
 
 #include "model/pattern.hpp"
 #include "model/viewport.hpp"
 
-#include "ui/renderer_oled.hpp"
-#include "ui/cursor/matrix_kb.hpp"
 #include "model/scale.hpp"
+#include "io/matrix_kb.hpp"
 #include "io/encoder_manager.hpp"
 
 class PerformanceView : public IView, public IEncoderHandler
@@ -49,6 +49,19 @@ public:
 
         if (last >= 0)
             st_.lastPitch = last;
+    }
+    
+    void onActivate() override
+    {
+        mkb_.setMode(MatrixKB::Mode::Performance);
+        Serial.println("=== PerformanceView Activated ===");
+        Serial.println("Matrix KB: Piano keyboard mode");
+        Serial.println("  ENC1 - Root, ENC2 - Octave, ENC3 - Scale");
+    }
+    
+    void onDeactivate() override
+    {
+        Serial.println("PerformanceView deactivated");
     }
     
     const char* getName() const override { return "Performance"; }

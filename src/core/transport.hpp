@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include "timebase.hpp"
+#include "types.hpp"
 
 struct TickWindow
 {
