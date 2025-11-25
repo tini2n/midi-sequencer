@@ -27,6 +27,15 @@ public:
     void onActivate() override;
     void onDeactivate() override;
     const char* getName() const override { return "Generative"; }
+    
+    // Provide encoder handler interface
+    IEncoderHandler* getEncoderHandler() override { return this; }
+    
+    // Set pattern reference (called once during initialization)
+    void setPattern(Pattern* pattern) override;
+    
+    // Set shared MatrixKB instance
+    void setMatrixKB(MatrixKB* mkb) { mkb_ = mkb; }
 
     // Generative-specific methods
     void triggerGeneration(Pattern& pattern);
@@ -41,12 +50,15 @@ public:
     void onEncoderButton(const EncoderButtonEvent& event) override;
 
 private:
-    MatrixKB mkb_{};
+    MatrixKB* mkb_{nullptr};
     RunLoop* runLoop_{nullptr};
     RecordEngine* recordEngine_{nullptr};
     Transport* transport_{nullptr};
     GeneratorManager generatorManager_;
     uint8_t midiChannel_{1};
+    
+    // Cached edit pitch (updated when encoder changes, not in draw)
+    uint8_t cachedEditPitch_{60};
     
     // UI state
     bool isGenerating_{false};

@@ -1,4 +1,5 @@
 #include "performance_view.hpp"
+#include "io/matrix_kb_mode.hpp" // For IModeConfig
 
 void PerformanceView::onEncoderRotation(const EncoderRotationEvent& event)
 {
@@ -6,7 +7,10 @@ void PerformanceView::onEncoderRotation(const EncoderRotationEvent& event)
     {
         case 0: // ENC1: Root note
         {
-            int newRoot = (int)st_.root + event.delta;
+            if (!mkb_) break;
+            IModeConfig cfg;
+            mkb_->getModeConfig(cfg);
+            int newRoot = (int)cfg.root + event.delta;
             // Wrap around 0-11 for chromatic scale
             while (newRoot < 0) newRoot += 12;
             while (newRoot >= 12) newRoot -= 12;
@@ -16,7 +20,10 @@ void PerformanceView::onEncoderRotation(const EncoderRotationEvent& event)
         }
         case 1: // ENC2: Octave
         {
-            int newOct = st_.octave + event.delta;
+            if (!mkb_) break;
+            IModeConfig cfg;
+            mkb_->getModeConfig(cfg);
+            int newOct = cfg.octave + event.delta;
             if (newOct < 0) newOct = 0;
             if (newOct > 10) newOct = 10;
             setOctave((int8_t)newOct);
@@ -88,12 +95,16 @@ void PerformanceView::draw(Pattern &pat, Viewport &vp, OledRenderer &oled, MidiI
     (void)playTick;
 
     char hud[48];
+    
+    // Read current mode config for HUD display
+    IModeConfig cfg;
+    if (mkb_) mkb_->getModeConfig(cfg);
 
     const char *scaleStr = "OFF";
     if (st_.scale == (uint8_t)Scale::Dorian) scaleStr = "Dor";
     else if (st_.scale == (uint8_t)Scale::Lydian) scaleStr = "Lyd";
     // HUD: mode indicator, bpm, octave, scale/fold
-    snprintf(hud, sizeof(hud), "PERF BP:%d OC:%d SC:%s%s", (int)pat.tempo, st_.octave, scaleStr, st_.fold?"*":"");
+    snprintf(hud, sizeof(hud), "PERF BP:%d OC:%d SC:%s%s", (int)pat.tempo, cfg.octave, scaleStr, st_.fold?"*":"");
 
     PianoRoll::Options o = {};
     o.highlightPitch = st_.lastPitch;

@@ -30,8 +30,20 @@ public:
     // Cursor mode specific API
     void setEditPitch(uint8_t pitch);
     void setShiftPressed(bool pressed) { shiftPressed_ = pressed; }
+    bool isShiftPressed() const { return shiftPressed_; }
     uint8_t getSelectedStep() const { return selectedStep_; }
     uint8_t getEditPitch() const { return editPitch_; }
+    
+    // IMatrixKBMode configuration interface
+    void configure(const IModeConfig& config) override
+    {
+        editPitch_ = config.editPitch;
+    }
+    
+    void getConfig(IModeConfig& config) const override
+    {
+        config.editPitch = editPitch_;
+    }
 
     // Edit operations (called by MatrixKB control row)
     void copyStep(Pattern &pattern);

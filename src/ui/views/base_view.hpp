@@ -66,6 +66,19 @@ public:
      * Get human-readable name for this view (for UI display).
      */
     virtual const char* getName() const = 0;
+    
+    /**
+     * Get encoder handler for this view (if supported).
+     * @return Pointer to IEncoderHandler implementation or nullptr if view doesn't use encoders
+     */
+    virtual class IEncoderHandler* getEncoderHandler() { return nullptr; }
+    
+    /**
+     * Set pattern reference (for views that need direct pattern access).
+     * Called once during initialization, not in render loop.
+     * @param pattern Pointer to pattern or nullptr
+     */
+    virtual void setPattern(Pattern* pattern) { (void)pattern; }
 };
 
 /**

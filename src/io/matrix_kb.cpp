@@ -27,13 +27,14 @@ void MatrixKB::onControl(uint8_t c, bool down)
     if (!down)
         return; // only on press for other controls
 
-    // Check if shift is pressed and we're in cursor mode
-    bool shiftActive = (mode_ == Mode::Cursor && cursorMode_.getSelectedStep() < 16);
+    // Check if shift is pressed for copy/paste/clear operations
+    bool shiftPressed = cursorMode_.isShiftPressed();
+    bool isCursorMode = (mode_ == Mode::Cursor);
 
     switch (c)
     {
-    case 0: // Rec arm toggle OR Shift+Rec = Clear step
-        if (shiftActive && pattern_)
+    case 0: // Rec arm toggle OR Shift+Rec = Clear step (cursor mode only)
+        if (shiftPressed && isCursorMode && pattern_)
         {
             cursorMode_.clearStep(*pattern_);
         }
@@ -45,8 +46,8 @@ void MatrixKB::onControl(uint8_t c, bool down)
         }
         break;
 
-    case 1: // Play/Pause OR Shift+Play = Copy step
-        if (shiftActive && pattern_)
+    case 1: // Play/Pause OR Shift+Play = Copy step (cursor mode only)
+        if (shiftPressed && isCursorMode && pattern_)
         {
             cursorMode_.copyStep(*pattern_);
         }
@@ -58,8 +59,8 @@ void MatrixKB::onControl(uint8_t c, bool down)
         }
         break;
 
-    case 2: // Stop OR Shift+Stop = Paste step
-        if (shiftActive && pattern_)
+    case 2: // Stop OR Shift+Stop = Paste step (cursor mode only)
+        if (shiftPressed && isCursorMode && pattern_)
         {
             cursorMode_.pasteToStep(*pattern_);
         }

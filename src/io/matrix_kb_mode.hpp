@@ -5,6 +5,21 @@ class MidiIO;
 class Pattern;
 
 /**
+ * Mode configuration parameters.
+ * Used by MatrixKB::configureMode() to set mode-specific values without tight coupling.
+ */
+struct IModeConfig
+{
+    // Performance mode parameters
+    uint8_t root{0};
+    int8_t octave{4};
+    uint8_t velocity{100};
+    
+    // Cursor mode parameters
+    uint8_t editPitch{60};
+};
+
+/**
  * Strategy interface for matrix keyboard behavior modes.
  * Decouples hardware scanning from button interpretation logic.
  */
@@ -42,4 +57,16 @@ public:
      * Called when mode is deactivated.
      */
     virtual void onDeactivate() {}
+    
+    /**
+     * Configure mode parameters (type-safe alternative to specific getters/setters).
+     * @param config Configuration structure with mode-specific parameters
+     */
+    virtual void configure(const IModeConfig& config) = 0;
+    
+    /**
+     * Read current mode configuration.
+     * @param config Output parameter filled with current mode state
+     */
+    virtual void getConfig(IModeConfig& config) const = 0;
 };

@@ -61,17 +61,16 @@ void CursorMode::selectStepAndToggle(uint8_t step, Pattern &pattern)
 {
     selectedStep_ = step;
     uint32_t tick = stepToTick(step, pattern);
-    Note *existing = findNoteAtStep(step, pattern);
-
-    if (existing)
-    {
-        // Remove note
-        pattern.track.notes.erase(
-            std::remove_if(pattern.track.notes.begin(),
+    
+    // Single-pass: find and remove in one go
+    auto it = std::find_if(pattern.track.notes.begin(),
                            pattern.track.notes.end(),
-                           [tick](const Note &n)
-                           { return n.on == tick; }),
-            pattern.track.notes.end());
+                           [tick](const Note &n) { return n.on == tick; });
+
+    if (it != pattern.track.notes.end())
+    {
+        // Remove note (single erase, no remove_if needed)
+        pattern.track.notes.erase(it);
         Serial.printf("[CursorMode] Removed note at step %u (tick %u)\n", step, tick);
     }
     else
@@ -89,6 +88,9 @@ void CursorMode::selectStepAndToggle(uint8_t step, Pattern &pattern)
         Serial.printf("[CursorMode] Added note %u at step %u (tick %u)\n",
                       editPitch_, step, tick);
     }
+    
+    // Keep notes sorted by time for O(log n) rendering culling
+    pattern.track.sortByTime();
 }
 
 void CursorMode::copyStep(Pattern &pattern)
@@ -128,6 +130,9 @@ void CursorMode::pasteToStep(Pattern &pattern)
     newNote.on = tick;
     pattern.track.notes.push_back(newNote);
     Serial.printf("[CursorMode] Pasted to step %u (pitch %u)\n", selectedStep_, newNote.pitch);
+    
+    // Keep notes sorted by time for O(log n) rendering culling
+    pattern.track.sortByTime();
 }
 
 void CursorMode::clearStep(Pattern &pattern)
@@ -151,6 +156,8 @@ void CursorMode::clearStep(Pattern &pattern)
 Note *CursorMode::findNoteAtStep(uint8_t step, Pattern &pattern)
 {
     uint32_t tick = stepToTick(step, pattern);
+    // Linear search is acceptable for small patterns (<64 notes)
+    // For larger patterns, consider sorted vector or map
     for (auto &note : pattern.track.notes)
     {
         if (note.on == tick)

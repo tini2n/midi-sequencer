@@ -48,7 +48,8 @@ void PianoRoll::drawGrid(U8G2 &u8g2, const Viewport &v)
 
 void PianoRoll::drawLanes(U8G2 &u8g2, const Viewport &v)
 {
-    const int H = Layout::H, LW = Layout::LABEL_W, LH = Layout::LANE_H, GX = Layout::GRID_X, GW = Layout::GRID_W;
+    const int H = Layout::H, LW = Layout::LABEL_W, LH = Layout::LANE_H;
+    (void)LW; // May be unused depending on drawing logic
 
     // u8g2.setFont(u8g2_font_minimal3x3_tu);
     u8g2.setFont(u8g2_font_u8glib_4_tf);
@@ -98,9 +99,30 @@ void PianoRoll::drawNotes(U8G2 &u8g2, const Track &t, const Viewport &v)
 {
     const int GX = Layout::GRID_X, GX1 = GX + Layout::GRID_W, H = Layout::H, LH = Layout::LANE_H;
     const int lanes = H / LH;
+    
+    // Early bailout for empty track
+    if (t.notes.empty())
+        return;
+    
+    // Limit iterations for performance - if we have too many notes, only draw visible ones
+    uint16_t notesDrawn = 0;
+    const uint16_t MAX_NOTES_PER_FRAME = 32; // Safety limit
 
     for (const auto &n : t.notes)
     {
+        // Safety: prevent runaway rendering
+        if (notesDrawn >= MAX_NOTES_PER_FRAME)
+            break;
+        
+        // Early exit optimization: IF track.notes sorted by time, we can stop early
+        // Call track.sortByTime() after edits for best performance
+        if (n.on > v.tickStart + v.tickSpan)
+            break; // All remaining notes are after viewport
+            
+        // Fast viewport culling: check time window first (cheapest)
+        if (n.on + n.duration < v.tickStart)
+            continue; // Note ends before viewport
+            
         // clip by pitch rows
         if (n.pitch < options_.pMin || n.pitch > options_.pMax)
             continue;
@@ -129,6 +151,8 @@ void PianoRoll::drawNotes(U8G2 &u8g2, const Track &t, const Viewport &v)
             drawMediumFill(u8g2, x0, y, w, h);
         else
             u8g2.drawBox(x0, y, w, h); // Full velocity
+            
+        notesDrawn++;
     }
 }
 

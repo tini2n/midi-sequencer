@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <algorithm>
 #include "note.hpp"
 
 struct Track
@@ -12,5 +13,12 @@ struct Track
     void clear()
     {
         notes.clear();
+    }
+    
+    // Sort notes by time for faster rendering culling
+    void sortByTime()
+    {
+        std::sort(notes.begin(), notes.end(), 
+                  [](const Note& a, const Note& b) { return a.on < b.on; });
     }
 };

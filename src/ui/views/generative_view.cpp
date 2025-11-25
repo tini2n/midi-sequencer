@@ -1,4 +1,5 @@
 #include "generative_view.hpp"
+#include "io/matrix_kb_mode.hpp" // For IModeConfig
 
 void GenerativeView::onEncoderRotation(const EncoderRotationEvent& event)
 {
@@ -35,11 +36,17 @@ void GenerativeView::onEncoderRotation(const EncoderRotationEvent& event)
         }
         case 2: // ENC3: Edit pitch for cursor mode
         {
+            if (!mkb_) break;
             // Control cursor mode edit pitch
-            int newPitch = (int)mkb_.getCursorMode().getEditPitch() + event.delta;
+            int newPitch = (int)cachedEditPitch_ + event.delta;
             if (newPitch < 0) newPitch = 0;
             if (newPitch > 127) newPitch = 127;
-            mkb_.getCursorMode().setEditPitch((uint8_t)newPitch);
+            
+            // Update mode via interface (no direct mode access)
+            IModeConfig config;
+            config.editPitch = (uint8_t)newPitch;
+            mkb_->configureMode(config);
+            cachedEditPitch_ = (uint8_t)newPitch;
             
             // Also update generator base_note for convenience
             float baseNote = 0;
@@ -102,13 +109,6 @@ void GenerativeView::begin(uint8_t midiChannel)
 {
     midiChannel_ = midiChannel;
     
-    MatrixKB::Config config;
-    config.address = cfg::PCF_ADDRESS;
-    mkb_.begin(config, 0, 4, 100);
-    
-    // Set to cursor mode for generative view
-    mkb_.setMode(MatrixKB::Mode::Cursor);
-    
     // Initialize generator manager
     generatorManager_.begin();
     
@@ -120,9 +120,15 @@ void GenerativeView::attach(RunLoop* runLoop, RecordEngine* recordEngine, Transp
     runLoop_ = runLoop;
     recordEngine_ = recordEngine;
     transport_ = transport;
-    mkb_.attach(runLoop, recordEngine, transport);
-    if (viewManager != nullptr) {
-        mkb_.attachViewManager(viewManager);
+    (void)viewManager; // Stored in MatrixKB directly
+}
+
+void GenerativeView::setPattern(Pattern* pattern)
+{
+    // Set pattern reference once during initialization (not in draw loop!)
+    if (mkb_ && pattern != nullptr) {
+        mkb_->setPattern(pattern);
+        Serial.println("[GenerativeView] Pattern reference set");
     }
 }
 
@@ -131,17 +137,14 @@ void GenerativeView::draw(Pattern& pattern, Viewport& viewport, OledRenderer& ol
 {
     (void)midi;
     
-    // Update pattern reference for cursor mode (in case it changed)
-    mkb_.setPattern(&pattern);
-    
     // Create HUD string for generative view
     char hud[64];
     drawHUD(hud, sizeof(hud));
     
     // Use the piano roll for pattern visualization
     PianoRoll::Options options = {};
-    // Highlight the edit pitch from cursor mode
-    options.highlightPitch = mkb_.getCursorMode().getEditPitch();
+    // Use cached edit pitch (updated by encoder handler, not here)
+    options.highlightPitch = cachedEditPitch_;
     
     oled.rollSetOptions(options);
     oled.drawFrame(pattern, viewport, now, playTick, hud);
@@ -150,13 +153,20 @@ void GenerativeView::draw(Pattern& pattern, Viewport& viewport, OledRenderer& ol
 void GenerativeView::poll(MidiIO& midi)
 {
     // Matrix keyboard now acts as step sequencer cursor in this view
-    mkb_.poll(midi, midiChannel_, nullptr);
+    if (mkb_) mkb_->poll(midi, midiChannel_, nullptr);
 }
 
 void GenerativeView::onActivate()
 {
     // Switch to cursor mode
-    mkb_.setMode(MatrixKB::Mode::Cursor);
+    if (mkb_) {
+        mkb_->setMode(MatrixKB::Mode::Cursor);
+        
+        // Initialize cached edit pitch from mode config
+        IModeConfig config;
+        mkb_->getModeConfig(config);
+        cachedEditPitch_ = config.editPitch;
+    }
     
     Serial.println("=== GenerativeView Activated ===");
     Serial.println("Serial Commands:");

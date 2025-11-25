@@ -23,23 +23,25 @@ void ViewManager::registerView(ViewType viewType, IView* view)
     }
 }
 
-void ViewManager::beginAll(uint8_t midiChannel)
+void ViewManager::initialize(RunLoop* runLoop, RecordEngine* recordEngine, Transport* transport,
+                            Pattern* pattern, uint8_t midiChannel,
+                            const EncoderManager::PinConfig encoderConfigs[EncoderManager::NUM_ENCODERS],
+                            uint32_t encoderDebounceUs)
 {
+    // Initialize all views
     for (auto* view : views_) {
         if (view != nullptr) {
             view->begin(midiChannel);
-        }
-    }
-}
-
-void ViewManager::attachAll(RunLoop* runLoop, RecordEngine* recordEngine, Transport* transport)
-{
-    for (auto* view : views_) {
-        if (view != nullptr) {
-            // Pass this ViewManager as the 4th parameter for view switching support
             view->attach(runLoop, recordEngine, transport, this);
+            view->setPattern(pattern);
         }
     }
+    
+    // Initialize encoders
+    encoderMgr_.begin(encoderConfigs, encoderDebounceUs);
+    encodersInitialized_ = true;
+    
+    Serial.println("ViewManager initialized: views + encoders ready");
 }
 
 bool ViewManager::switchToView(ViewType viewType)
@@ -72,11 +74,6 @@ bool ViewManager::switchToView(ViewType viewType)
     return true;
 }
 
-void ViewManager::activateView(ViewType viewType)
-{
-    switchToView(viewType);
-}
-
 void ViewManager::switchToNextView()
 {
     // Switch between Performance and Generative views only
@@ -104,36 +101,20 @@ void ViewManager::draw(Pattern& pattern, Viewport& viewport, OledRenderer& oled,
     }
 }
 
-void ViewManager::poll(MidiIO& midi)
+void ViewManager::pollKB(MidiIO& midi)
 {
     if (currentView_ != nullptr) {
         currentView_->poll(midi);
     }
-    
-    // Poll encoders if initialized
-    if (encodersInitialized_) {
-        pollEncoders();
-    }
-}
-
-void ViewManager::beginEncoders(const EncoderManager::PinConfig configs[EncoderManager::NUM_ENCODERS], 
-                                uint32_t debounceUs)
-{
-    encoderMgr_.begin(configs, debounceUs);
-    encodersInitialized_ = true;
-    Serial.println("Encoder manager initialized");
 }
 
 void ViewManager::pollEncoders()
 {
-    // Set current view as handler based on view type
-    // Both PerformanceView and GenerativeView implement IEncoderHandler
+    // Polymorphic dispatch - no type casting needed!
+    // Views that implement IEncoderHandler will return themselves
     IEncoderHandler* handler = nullptr;
-    
-    if (currentViewType_ == ViewType::Performance) {
-        handler = static_cast<PerformanceView*>(currentView_);
-    } else if (currentViewType_ == ViewType::Generative) {
-        handler = static_cast<GenerativeView*>(currentView_);
+    if (currentView_) {
+        handler = currentView_->getEncoderHandler();
     }
     
     encoderMgr_.setHandler(handler);

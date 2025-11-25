@@ -42,6 +42,21 @@ public:
     uint8_t getRoot() const { return root_; }
     int8_t getOctave() const { return oct_; }
     uint8_t getVelocity() const { return vel_; }
+    
+    // IMatrixKBMode configuration interface
+    void configure(const IModeConfig& config) override
+    {
+        root_ = config.root;
+        oct_ = config.octave;
+        vel_ = config.velocity;
+    }
+    
+    void getConfig(IModeConfig& config) const override
+    {
+        config.root = root_;
+        config.octave = oct_;
+        config.velocity = vel_;
+    }
 
 private:
     bool pressed_[16] = {};  // per-button pressed state
