@@ -42,10 +42,7 @@ void GenerativeView::onEncoderRotation(const EncoderRotationEvent& event)
             if (newPitch < 0) newPitch = 0;
             if (newPitch > 127) newPitch = 127;
             
-            // Update mode via interface (no direct mode access)
-            IModeConfig config;
-            config.editPitch = (uint8_t)newPitch;
-            mkb_->configureMode(config);
+            // Update cached edit pitch only; MatrixKB has no mode API here
             cachedEditPitch_ = (uint8_t)newPitch;
             
             // Also update generator base_note for convenience
@@ -123,14 +120,6 @@ void GenerativeView::attach(RunLoop* runLoop, RecordEngine* recordEngine, Transp
     (void)viewManager; // Stored in MatrixKB directly
 }
 
-void GenerativeView::setPattern(Pattern* pattern)
-{
-    // Set pattern reference once during initialization (not in draw loop!)
-    if (mkb_ && pattern != nullptr) {
-        mkb_->setPattern(pattern);
-        Serial.println("[GenerativeView] Pattern reference set");
-    }
-}
 
 void GenerativeView::draw(Pattern& pattern, Viewport& viewport, OledRenderer& oled, 
                          MidiIO& midi, uint32_t now, uint32_t playTick)
@@ -158,15 +147,8 @@ void GenerativeView::poll(MidiIO& midi)
 
 void GenerativeView::onActivate()
 {
-    // Switch to cursor mode
-    if (mkb_) {
-        mkb_->setMode(MatrixKB::Mode::Cursor);
-        
-        // Initialize cached edit pitch from mode config
-        IModeConfig config;
-        mkb_->getModeConfig(config);
-        cachedEditPitch_ = config.editPitch;
-    }
+    // Initialize cached edit pitch default
+    cachedEditPitch_ = 60;
     
     Serial.println("=== GenerativeView Activated ===");
     Serial.println("Serial Commands:");

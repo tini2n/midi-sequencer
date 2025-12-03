@@ -54,7 +54,6 @@ public:
     
     void onActivate() override
     {
-        if (mkb_) mkb_->setMode(MatrixKB::Mode::Performance);
         Serial.println("=== PerformanceView Activated ===");
         Serial.println("Matrix KB: Piano keyboard mode");
         Serial.println("  ENC1 - Root, ENC2 - Octave, ENC3 - Scale");
@@ -70,27 +69,15 @@ public:
     IEncoderHandler* getEncoderHandler() override { return this; }
 
     // Performance-specific methods
-    void setRoot(uint8_t semis) { if (mkb_) mkb_->setRoot(semis); }
-    void setOctave(int8_t o) { if (mkb_) mkb_->setOctave(o); }
+    void setRoot(uint8_t semis) { if (mkb_) mkb_->setRoot(semis); st_.root = semis % 12; }
+    void setOctave(int8_t o) { if (mkb_) mkb_->setOctave(o); st_.octave = o; }
     void setScale(Scale s) { if (mkb_) mkb_->setScale(s); st_.scale = (uint8_t)s; }
     void setFold(bool f) { if (mkb_) mkb_->setFold(f); st_.fold = f; }
     
     // Getters that read from mode config
-    uint8_t getRoot() const
-    {
-        if (!mkb_) return 0;
-        IModeConfig cfg;
-        mkb_->getModeConfig(cfg);
-        return cfg.root;
-    }
+    uint8_t getRoot() const { return st_.root; }
     
-    int8_t getOctave() const
-    {
-        if (!mkb_) return 4;
-        IModeConfig cfg;
-        mkb_->getModeConfig(cfg);
-        return cfg.octave;
-    }
+    int8_t getOctave() const { return st_.octave; }
 
     PerformanceState &state() { return st_; }
     void setLastPitch(int p) { st_.lastPitch = p; }

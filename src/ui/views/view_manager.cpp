@@ -31,7 +31,6 @@ void ViewManager::initialize(RunLoop* runLoop, RecordEngine* recordEngine, Trans
         if (view != nullptr) {
             view->begin(midiChannel);
             view->attach(runLoop, recordEngine, transport, this);
-            view->setPattern(pattern);
         }
     }
     

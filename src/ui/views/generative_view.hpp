@@ -63,4 +63,7 @@ private:
     
     // UI helpers
     void drawHUD(char* buffer, size_t bufferSize) const;
+
+public:
+    void setMatrixKB(MatrixKB* mkb) { mkb_ = mkb; }
 };
