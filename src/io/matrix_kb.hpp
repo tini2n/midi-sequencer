@@ -6,6 +6,7 @@
 #include "core/transport.hpp"
 #include "engine/record_engine.hpp"
 #include "model/scale.hpp"
+#include "io/matrix_kb_mode.hpp"
 
 class MatrixKB
 {
@@ -70,40 +71,34 @@ public:
     {
         vm_ = vm;
     }
+    
+    // Set keyboard mode (piano keyboard vs step sequencer cursor)
+    void setMode(IMatrixKBMode* mode)
+    {
+        mode_ = mode;
+    }
 
     void poll(MidiIO &midi, uint8_t ch, int *lastPitchOpt = nullptr)
     {
-        uint32_t scanStart = micros();
-        
-        // Throttle to max 200Hz (5ms interval) to reduce I2C bus load
-        if ((int32_t)(scanStart - lastScanUs_) < 5000) {
-            return;
-        }
-        lastScanUs_ = scanStart;
+        uint32_t now = micros();
         
         // Scan each row
         for (uint8_t r = 0; r < 3; r++)
         {
             // Drive row low, others high
             if (!driveRow(r)) {
-                continue;
+                continue; // Skip this row on I2C error
             }
-            
-            // Wait for signals to settle (matrix RC time + PCF8575 propagation)
-            delayMicroseconds(200);
             
             // Read column states
             uint16_t pins = 0xFFFF;
             if (!pcf_.read(pins)) {
-                continue;
+                continue; // Skip this row on I2C error
             }
             
             // Process each column
             for (uint8_t c = 0; c < 8; c++)
             {
-                // Take a fresh timestamp per key evaluation
-                uint32_t now = micros();
-                
                 bool down = ((pins >> cfg_.cols[c]) & 1) == 0;
                 int btn = rowToBtn(r, c);
                 if (btn < 0)
@@ -130,7 +125,17 @@ public:
                     continue;
                 }
                 
-                // Musical keys
+                // If mode is set, delegate to mode handler
+                if (mode_)
+                {
+                    if (down)
+                        mode_->onButtonDown(btn, midi, ch, modeContext_);
+                    else
+                        mode_->onButtonUp(btn, midi, ch, modeContext_);
+                    continue;
+                }
+                
+                // Default: Musical piano keys
                 if (down)
                 {
                     noteOn(btn, midi, ch, lastPitchOpt);
@@ -149,7 +154,6 @@ public:
 private:
     PCF8575 pcf_;
     Config cfg_;
-    uint32_t lastScanUs_{0};
 
     bool driveRow(uint8_t r)
     {
@@ -300,4 +304,10 @@ private:
     RecordEngine *rec_{nullptr};
     Transport *tx_{nullptr};
     class ViewManager *vm_{nullptr};
+    IMatrixKBMode *mode_{nullptr};
+    void *modeContext_{nullptr};
+
+public:
+    // Set context data that will be passed to mode handlers (e.g., Pattern*)
+    void setModeContext(void* ctx) { modeContext_ = ctx; }
 };

@@ -5,6 +5,7 @@
 #include "io/matrix_kb.hpp"
 #include "engine/generator_manager.hpp"
 #include "io/encoder_manager.hpp"
+#include "io/cursor_mode.hpp"
 #include "config.hpp"
 
 #include "engine/generator_manager.hpp"
@@ -24,6 +25,8 @@ public:
     // IView interface implementation
     void begin(uint8_t midiChannel) override;
     void attach(RunLoop* runLoop, RecordEngine* recordEngine, Transport* transport, class ViewManager* viewManager = nullptr) override;
+    
+    void setPattern(Pattern* pattern) { pattern_ = pattern; }
     
     void draw(Pattern& pattern, Viewport& viewport, OledRenderer& oled, 
               MidiIO& midi, uint32_t now, uint32_t playTick) override;
@@ -48,11 +51,13 @@ public:
 
 private:
     MatrixKB* mkb_{nullptr};
+    Pattern* pattern_{nullptr};
     RunLoop* runLoop_{nullptr};
     RecordEngine* recordEngine_{nullptr};
     Transport* transport_{nullptr};
     GeneratorManager generatorManager_;
     uint8_t midiChannel_{1};
+    CursorMode cursorMode_;
     
     // Cached edit pitch (updated when encoder changes, not in draw)
     uint8_t cachedEditPitch_{60};

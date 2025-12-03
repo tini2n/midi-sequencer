@@ -44,6 +44,15 @@ public:
     {
         config.editPitch = editPitch_;
     }
+    
+    /**
+     * Handle control events for cursor mode:
+     * - Shift+Rec (0): Clear step
+     * - Shift+Play (1): Copy step
+     * - Shift+Stop (2): Paste to step
+     * - Ctl7: Update shift state
+     */
+    bool onControl(uint8_t c, bool down, bool shift, void* context) override;
 
     // Edit operations (called by MatrixKB control row)
     void copyStep(Pattern &pattern);

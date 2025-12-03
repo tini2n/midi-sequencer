@@ -150,6 +150,13 @@ void GenerativeView::onActivate()
     // Initialize cached edit pitch default
     cachedEditPitch_ = 60;
     
+    // Switch matrix keyboard to cursor (step sequencer) mode
+    if (mkb_ && pattern_) {
+        mkb_->setMode(&cursorMode_);
+        mkb_->setModeContext(pattern_);
+        cursorMode_.onActivate();
+    }
+    
     Serial.println("=== GenerativeView Activated ===");
     Serial.println("Serial Commands:");
     Serial.println("  'g' - Generate pattern");
@@ -177,6 +184,10 @@ void GenerativeView::onActivate()
 
 void GenerativeView::onDeactivate()
 {
+    // Restore default piano keyboard behavior
+    if (mkb_) {
+        mkb_->setMode(nullptr);
+    }
     Serial.println("GenerativeView deactivated");
 }
 

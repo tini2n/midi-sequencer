@@ -2,6 +2,36 @@
 #include "core/timebase.hpp"
 #include <algorithm>
 
+bool CursorMode::onControl(uint8_t c, bool down, bool shift, void* context)
+{
+    // Update shift state (button 7)
+    if (c == 7) {
+        shiftPressed_ = down;
+        return true; // Always handle shift
+    }
+    
+    // Only handle shift-modified events on press
+    if (!shift || !down || !context) {
+        return false;
+    }
+    
+    Pattern& pattern = *static_cast<Pattern*>(context);
+    
+    switch (c) {
+        case 0: // Shift+Rec: Clear step
+            clearStep(pattern);
+            return true;
+        case 1: // Shift+Play: Copy step
+            copyStep(pattern);
+            return true;
+        case 2: // Shift+Stop: Paste step
+            pasteToStep(pattern);
+            return true;
+        default:
+            return false;
+    }
+}
+
 void CursorMode::onButtonDown(uint8_t btn, MidiIO &midi, uint8_t ch, void *context)
 {
     (void)midi;
@@ -168,6 +198,9 @@ Note *CursorMode::findNoteAtStep(uint8_t step, Pattern &pattern)
 
 uint32_t CursorMode::stepToTick(uint8_t step, const Pattern &pattern) const
 {
+    if (pattern.steps == 0)
+        return 0; // safe default; caller should handle empty pattern
+    uint8_t clampedStep = (step >= pattern.steps) ? (pattern.steps - 1) : step;
     uint32_t ticksPerStep = pattern.ticks() / pattern.steps;
-    return step * ticksPerStep;
+    return static_cast<uint32_t>(clampedStep) * ticksPerStep;
 }

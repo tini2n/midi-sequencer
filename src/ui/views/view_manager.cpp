@@ -38,6 +38,13 @@ void ViewManager::initialize(RunLoop* runLoop, RecordEngine* recordEngine, Trans
     encoderMgr_.begin(encoderConfigs, encoderDebounceUs);
     encodersInitialized_ = true;
     
+    // Activate the initial view and set up encoder handler
+    if (currentView_ != nullptr) {
+        currentView_->onActivate();
+        encoderMgr_.setHandler(currentView_->getEncoderHandler());
+        Serial.printf("Initial view activated: %s\n", getCurrentViewName());
+    }
+    
     Serial.println("ViewManager initialized: views + encoders ready");
 }
 

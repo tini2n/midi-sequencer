@@ -15,8 +15,10 @@ void MatrixKB::onControl(uint8_t c, bool down)
 {
     // Log to USB Serial for visibility
     Serial.printf("CTL %u %s\n", c, down ? "DOWN" : "UP");
-    if (!down)
-        return; // only on press
+    
+    // Default transport/view control logic (only on press)
+    if (!down) return;
+    
     switch (c)
     {
     case 0: // Rec arm toggle
@@ -34,7 +36,6 @@ void MatrixKB::onControl(uint8_t c, bool down)
             rl_->post(AppEvent{running ? AppEvent::Type::Pause : AppEvent::Type::Play});
             Serial.println(running ? "POST: Pause" : "POST: Play");
         }
-
         break;
     case 2: // Stop
         if (rl_)
@@ -44,18 +45,16 @@ void MatrixKB::onControl(uint8_t c, bool down)
         }
         break;
     case 3:
-        break;
     case 4:
-        break;
     case 5:
         break;
-    case 6:
+    case 6: // View switch
         if (vm_)
         {
             vm_->switchToNextView();
         }
         break;
-    case 7: // shift (reserved)
+    case 7: // Shift (handled by mode if needed)
         break;
     default:
         break;

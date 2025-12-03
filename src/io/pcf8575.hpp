@@ -11,20 +11,24 @@ public:
     bool begin(uint8_t address = 0x20)
     {
         address_ = address;
-        Wire.begin();
-        Wire.setClock(400000); // 400kHz I2C
+        // Note: Wire.begin() and Wire.setClock() must be called in main.cpp
+        // before calling this method
         
         out_ = 0xFFFF;
         
         // Verify device is present
         Wire.beginTransmission(address_);
-        if (Wire.endTransmission() != 0) {
-            Serial.printf("PCF8575 not found at 0x%02X\n", address_);
+        uint8_t result = Wire.endTransmission();
+        if (result != 0) {
+            Serial.printf("PCF8575 not found at 0x%02X (error=%u)\n", address_, result);
             return false;
         }
         
         // Initialize all pins as inputs (high)
-        write(0xFFFF);
+        if (!write(0xFFFF)) {
+            Serial.printf("PCF8575 initial write failed at 0x%02X\n", address_);
+            return false;
+        }
         Serial.printf("PCF8575 OK at 0x%02X\n", address_);
         return true;
     }
@@ -35,11 +39,10 @@ public:
     bool write(uint16_t value)
     {
         Wire.beginTransmission(address_);
-        Wire.write(value & 0xFF);
-        Wire.write(value >> 8);
-        uint8_t result = Wire.endTransmission();
+        Wire.write((uint8_t)(value & 0xFF));
+        Wire.write((uint8_t)(value >> 8));
         
-        if (result == 0) {
+        if (Wire.endTransmission() == 0) {
             out_ = value;
             return true;
         }

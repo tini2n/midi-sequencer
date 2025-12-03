@@ -70,6 +70,7 @@ void setup()
   Serial.println("View system: Performance (default) and Generative modes");
   Serial.println("Switch views: Control button 6");
 
+  // Initialize SPI devices first (OLED)
   oled.begin();
   midi.begin();
   sched.begin();
@@ -90,6 +91,11 @@ void setup()
   runner.begin(&sched, &transport, &engine, &midi, &pat);
   recorder.begin(&pat, &transport);
   
+  // Initialize I2C bus for matrix keyboard (PCF8575)
+  Wire.begin();
+  Wire.setClock(400000); // 400kHz
+  delay(50); // Let I2C bus stabilize
+  
   // Initialize shared matrix keyboard
   MatrixKB::Config kbConfig;
   kbConfig.address = cfg::PCF_ADDRESS;
@@ -101,9 +107,10 @@ void setup()
   viewManager.registerView(ViewType::Performance, &performanceView);
   viewManager.registerView(ViewType::Generative, &generativeView);
   
-  // Inject shared MatrixKB into views
+  // Inject shared MatrixKB and Pattern into views
   performanceView.setMatrixKB(&matrixKB);
   generativeView.setMatrixKB(&matrixKB);
+  generativeView.setPattern(&pat);
   
   viewManager.initialize(&runner, &recorder, &transport, &pat, pat.track.channel,
                          ENCODER_PINS, cfg::ENCODER_DEBOUNCE_US);
@@ -127,6 +134,6 @@ void loop()
   if ((int32_t)(now - nextDraw) >= 0)
   {
     viewManager.draw(pat, vp, oled, midi, now, transport.playTick());
-    nextDraw = now + 10000; // ~33Hz
+    nextDraw = now + 33333; // ~30 FPS
   }
 }

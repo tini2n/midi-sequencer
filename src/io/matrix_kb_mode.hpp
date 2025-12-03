@@ -69,4 +69,17 @@ public:
      * @param config Output parameter filled with current mode state
      */
     virtual void getConfig(IModeConfig& config) const = 0;
+    
+    /**
+     * Handle control button events (transport, shift, etc.).
+     * @param c Control button index (0-7)
+     * @param down Button state (true=pressed, false=released)
+     * @param shift Shift key state
+     * @param context Mode-specific context (e.g., Pattern* for cursor mode)
+     * @return true if event was handled by mode, false to use default handling
+     */
+    virtual bool onControl(uint8_t c, bool down, bool shift, void* context) {
+        (void)c; (void)down; (void)shift; (void)context;
+        return false; // Default: event not handled
+    }
 };
