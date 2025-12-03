@@ -106,6 +106,13 @@ public:
                 EncoderButtonEvent evt{i, true};
                 handler_->onEncoderButton(evt);
             }
+            
+            // Check button release (edge detection)
+            if (encoders_[i].wasReleased())
+            {
+                EncoderButtonEvent evt{i, false};
+                handler_->onEncoderButton(evt);
+            }
         }
     }
     

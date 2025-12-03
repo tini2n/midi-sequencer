@@ -68,6 +68,21 @@ bool ViewManager::switchToView(ViewType viewType)
     // Activate new view
     if (currentView_ != nullptr) {
         currentView_->onActivate();
+        
+        // Set encoder handler for the newly activated view if encoders are initialized
+        // Both PerformanceView and GenerativeView implement IEncoderHandler
+        if (encodersInitialized_) {
+            IEncoderHandler* handler = nullptr;
+            
+            // Type safety: ViewType enum guarantees currentView_ matches expected type
+            if (currentViewType_ == ViewType::Performance) {
+                handler = static_cast<IEncoderHandler*>(static_cast<PerformanceView*>(currentView_));
+            } else if (currentViewType_ == ViewType::Generative) {
+                handler = static_cast<IEncoderHandler*>(static_cast<GenerativeView*>(currentView_));
+            }
+            
+            encoderMgr_.setHandler(handler);
+        }
     }
     
     Serial.printf("Switched to view: %s\n", getCurrentViewName());
@@ -110,16 +125,7 @@ void ViewManager::pollKB(MidiIO& midi)
 
 void ViewManager::pollEncoders()
 {
-    // Polymorphic dispatch - no type casting needed!
-    // Views that implement IEncoderHandler will return themselves
-    IEncoderHandler* handler = nullptr;
-    if (currentView_) {
-        handler = currentView_->getEncoderHandler();
-    }
-    
-    encoderMgr_.setHandler(handler);
-    
-    // Poll encoders (will dispatch to current handler)
+    // Handler was already set in activateView(), just poll
     encoderMgr_.poll();
 }
 
