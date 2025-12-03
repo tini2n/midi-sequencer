@@ -1,6 +1,4 @@
 #include "view_manager.hpp"
-#include "performance_view.hpp"
-#include "generative_view.hpp"
 
 void ViewManager::registerView(ViewType viewType, IView* view)
 {
@@ -70,18 +68,8 @@ bool ViewManager::switchToView(ViewType viewType)
         currentView_->onActivate();
         
         // Set encoder handler for the newly activated view if encoders are initialized
-        // Both PerformanceView and GenerativeView implement IEncoderHandler
         if (encodersInitialized_) {
-            IEncoderHandler* handler = nullptr;
-            
-            // Type safety: ViewType enum guarantees currentView_ matches expected type
-            if (currentViewType_ == ViewType::Performance) {
-                handler = static_cast<IEncoderHandler*>(static_cast<PerformanceView*>(currentView_));
-            } else if (currentViewType_ == ViewType::Generative) {
-                handler = static_cast<IEncoderHandler*>(static_cast<GenerativeView*>(currentView_));
-            }
-            
-            encoderMgr_.setHandler(handler);
+            encoderMgr_.setHandler(currentView_->getEncoderHandler());
         }
     }
     

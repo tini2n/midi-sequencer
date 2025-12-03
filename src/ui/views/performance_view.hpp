@@ -67,7 +67,6 @@ public:
     
     const char* getName() const override { return "Performance"; }
     
-    // Provide encoder handler interface
     IEncoderHandler* getEncoderHandler() override { return this; }
 
     // Performance-specific methods

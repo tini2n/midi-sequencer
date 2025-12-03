@@ -73,13 +73,13 @@ public:
 
     void poll(MidiIO &midi, uint8_t ch, int *lastPitchOpt = nullptr)
     {
-        uint32_t now = micros();
+        uint32_t scanStart = micros();
         
         // Throttle to max 200Hz (5ms interval) to reduce I2C bus load
-        if ((int32_t)(now - lastScanUs_) < 5000) {
+        if ((int32_t)(scanStart - lastScanUs_) < 5000) {
             return;
         }
-        lastScanUs_ = now;
+        lastScanUs_ = scanStart;
         
         // Scan each row
         for (uint8_t r = 0; r < 3; r++)
@@ -101,6 +101,9 @@ public:
             // Process each column
             for (uint8_t c = 0; c < 8; c++)
             {
+                // Take a fresh timestamp per key evaluation
+                uint32_t now = micros();
+                
                 bool down = ((pins >> cfg_.cols[c]) & 1) == 0;
                 int btn = rowToBtn(r, c);
                 if (btn < 0)
