@@ -25,10 +25,9 @@ void PerformanceView::onEncoderRotation(const EncoderRotationEvent& event)
         }
         case 2: // ENC3: Scale selection
         {
-            int scaleIdx = (int)st_.scale + event.delta;
             // Wrap through Scale enum (None=0, Dorian=1, Lydian=2)
-            if (scaleIdx < 0) scaleIdx = 2;
-            if (scaleIdx > 2) scaleIdx = 0;
+            int scaleIdx = ((int)st_.scale + event.delta) % 3;
+            if (scaleIdx < 0) scaleIdx += 3;
             setScale((Scale)scaleIdx);
             Serial.printf("[PerformanceView] ENC3 Scale: %d\n", scaleIdx);
             break;

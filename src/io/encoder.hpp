@@ -71,14 +71,18 @@ public:
         int8_t result = delta_;
         delta_ = 0;
         
-        // Switch debouncing
-        if (now >= debounceUntil_)
+        // Switch debouncing (wraparound-safe comparison)
+        if ((int32_t)(now - debounceUntil_) >= 0)
         {
             bool sw = digitalRead(pinSW_) == LOW; // Active LOW
             if (sw != lastSwitch_)
             {
                 lastSwitch_ = sw;
-                switchPressed_ = sw; // True on press edge
+                if (sw) {
+                    switchPressed_ = true;  // Press edge
+                } else {
+                    switchReleased_ = true; // Release edge
+                }
                 debounceUntil_ = now + debounceUs_;
             }
         }
@@ -98,6 +102,17 @@ public:
     }
     
     /**
+     * Check if switch was released since last poll.
+     * Returns true only once per release (edge detection).
+     */
+    bool wasReleased()
+    {
+        bool result = switchReleased_;
+        switchReleased_ = false;
+        return result;
+    }
+    
+    /**
      * Check current switch state (level detection).
      * @return true if switch is currently held down
      */
@@ -113,6 +128,7 @@ public:
     {
         delta_ = 0;
         switchPressed_ = false;
+        switchReleased_ = false;
         lastStateAB_ = readAB();
         lastSwitch_ = digitalRead(pinSW_) == LOW;
     }
@@ -129,6 +145,7 @@ private:
     // Switch state
     bool lastSwitch_{false};     // Last debounced switch state
     bool switchPressed_{false};  // Edge flag: true on press
+    bool switchReleased_{false}; // Edge flag: true on release
     
     /**
      * Read current AB state as 2-bit value (B=bit1, A=bit0).
