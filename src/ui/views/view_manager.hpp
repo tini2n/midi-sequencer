@@ -23,18 +23,19 @@ public:
     void registerView(ViewType viewType, IView* view);
 
     /**
-     * Initialize all registered views.
-     * @param midiChannel MIDI channel to pass to all views
-     */
-    void beginAll(uint8_t midiChannel);
-
-    /**
-     * Attach core systems to all registered views, including this ViewManager for view switching.
+     * Initialize all views and encoders (call once after registering all views).
      * @param runLoop Main run loop
      * @param recordEngine Recording engine
      * @param transport Transport system
+     * @param pattern Pattern reference
+     * @param midiChannel MIDI channel
+     * @param encoderConfigs Encoder pin configurations
+     * @param encoderDebounceUs Encoder debounce time in microseconds
      */
-    void attachAll(RunLoop* runLoop, RecordEngine* recordEngine, Transport* transport);
+    void initialize(RunLoop* runLoop, RecordEngine* recordEngine, Transport* transport,
+                   Pattern* pattern, uint8_t midiChannel,
+                   const EncoderManager::PinConfig encoderConfigs[EncoderManager::NUM_ENCODERS],
+                   uint32_t encoderDebounceUs = 5000);
 
     /**
      * Switch to a different view.
@@ -70,21 +71,12 @@ public:
               MidiIO& midi, uint32_t now, uint32_t playTick);
 
     /**
-     * Poll input for the current active view.
+     * Poll keyboard input for the current active view.
      */
-    void poll(MidiIO& midi);
-
-    /**
-     * Initialize encoder manager with pin configuration.
-     * @param configs Array of 8 encoder pin configurations
-     * @param debounceUs Debounce time in microseconds (default 5000)
-     */
-    void beginEncoders(const EncoderManager::PinConfig configs[EncoderManager::NUM_ENCODERS], 
-                       uint32_t debounceUs = 5000);
+    void pollKB(MidiIO& midi);
 
     /**
      * Poll encoders and dispatch to current view.
-     * Called automatically by poll().
      */
     void pollEncoders();
 
@@ -99,6 +91,4 @@ private:
     IView* currentView_{nullptr};
     EncoderManager encoderMgr_{};
     bool encodersInitialized_{false};
-
-    void activateView(ViewType viewType);
 };

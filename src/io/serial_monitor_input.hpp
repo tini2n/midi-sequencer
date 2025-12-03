@@ -108,7 +108,7 @@ public:
             if (c == '+')
             {
                 // octave up
-                int8_t o = perf_->state().octave;
+                int8_t o = perf_->getOctave();
                 if (o < 10)
                     o++;
                 perf_->setOctave(o);
@@ -118,7 +118,7 @@ public:
             if (c == '-')
             {
                 // octave down
-                int8_t o = perf_->state().octave;
+                int8_t o = perf_->getOctave();
                 if (o > 0)
                     o--;
                 perf_->setOctave(o);
@@ -128,7 +128,7 @@ public:
             if (c == '=')
             {
                 // root up
-                int8_t r = perf_->state().root;
+                uint8_t r = perf_->getRoot();
                 if (r < 11)
                     r++;
                 else
@@ -140,7 +140,7 @@ public:
             if (c == '_')
             {
                 // root down
-                int8_t r = perf_->state().root;
+                uint8_t r = perf_->getRoot();
                 if (r > 0)
                     r--;
                 else

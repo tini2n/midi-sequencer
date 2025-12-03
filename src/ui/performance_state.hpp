@@ -13,10 +13,11 @@ struct PerformanceState
 {
   PerformanceMode mode = PerformanceMode::Keyboard;
   uint8_t channel{1};                  // use Pattern.track.channel at init
-  int8_t octave{0};                     // MIDI 0–10 (clamped)
-  uint8_t root{0};                      // 0=C … 11=B
-  uint8_t  velocity{127}; 
-  uint8_t  lastPitch{255};
+  uint8_t velocity{127}; 
+  uint8_t lastPitch{255};
+  // Keyboard base settings
+  uint8_t root{0};     // 0..11 semitone root (C=0)
+  int8_t octave{4};    // 0..10 octave
   // Scale filtering
   uint8_t scale{0};     // 0=off, 1=Dorian, 2=Lydian (maps to Scale enum)
   bool fold{false};     // When true and scale!=off → map all 16 keys to scale degrees

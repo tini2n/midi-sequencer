@@ -7,6 +7,7 @@
 
 #include "ui/performance_state.hpp"
 #include "ui/views/base_view.hpp"
+#include "ui/renderer_oled.hpp"
 
 #include "core/midi_io.hpp"
 
@@ -16,6 +17,8 @@
 #include "ui/renderer_oled.hpp"
 #include "io/matrix_kb.hpp"
 #include "model/scale.hpp"
+#include "io/matrix_kb.hpp"
+#include "io/matrix_kb_mode.hpp"
 #include "io/encoder_manager.hpp"
 
 class PerformanceView : public IView, public IEncoderHandler
@@ -25,30 +28,40 @@ public:
     void begin(uint8_t midiCh) override
     {
         st_.channel = midiCh;
-        st_.root = 0;
-        st_.octave = 4;
-        MatrixKB::Config config;
-        config.address = cfg::PCF_ADDRESS;
-        mkb_.begin(config, 0, 4, 100);
     }
     
     void attach(RunLoop* rl, RecordEngine* re, Transport* tx, class ViewManager* vm = nullptr) override
     {
-        mkb_.attach(rl, re, tx);
-        if (vm != nullptr) {
-            mkb_.attachViewManager(vm);
-        }
+        rl_ = rl;
+        re_ = re;
+        tx_ = tx;
+        vm_ = vm;
     }
+    
+    void setMatrixKB(MatrixKB* mkb) { mkb_ = mkb; }
     
     void draw(Pattern &pat, Viewport &vp, OledRenderer &oled, MidiIO &midi, uint32_t now, uint32_t playTick) override;
     
     void poll(MidiIO &midi) override
     {
+        if (!mkb_) return;
         int last = -1;
-        mkb_.poll(midi, st_.channel, &last);
+        mkb_->poll(midi, st_.channel, &last);
 
         if (last >= 0)
             st_.lastPitch = last;
+    }
+    
+    void onActivate() override
+    {
+        Serial.println("=== PerformanceView Activated ===");
+        Serial.println("Matrix KB: Piano keyboard mode");
+        Serial.println("  ENC1 - Root, ENC2 - Octave, ENC3 - Scale");
+    }
+    
+    void onDeactivate() override
+    {
+        Serial.println("PerformanceView deactivated");
     }
     
     const char* getName() const override { return "Performance"; }
@@ -56,10 +69,15 @@ public:
     IEncoderHandler* getEncoderHandler() override { return this; }
 
     // Performance-specific methods
-    void setRoot(uint8_t semis) { mkb_.setRoot(semis); st_.root = semis % 12; }
-    void setOctave(int8_t o) { mkb_.setOctave(o); st_.octave = o; }
-    void setScale(Scale s) { mkb_.setScale(s); st_.scale = (uint8_t)s; }
-    void setFold(bool f) { mkb_.setFold(f); st_.fold = f; }
+    void setRoot(uint8_t semis) { if (mkb_) mkb_->setRoot(semis); st_.root = semis % 12; }
+    void setOctave(int8_t o) { if (mkb_) mkb_->setOctave(o); st_.octave = o; }
+    void setScale(Scale s) { if (mkb_) mkb_->setScale(s); st_.scale = (uint8_t)s; }
+    void setFold(bool f) { if (mkb_) mkb_->setFold(f); st_.fold = f; }
+    
+    // Getters that read from mode config
+    uint8_t getRoot() const { return st_.root; }
+    
+    int8_t getOctave() const { return st_.octave; }
 
     PerformanceState &state() { return st_; }
     void setLastPitch(int p) { st_.lastPitch = p; }
@@ -70,5 +88,9 @@ public:
 
 private:
     PerformanceState st_{};
-    MatrixKB mkb_{};
+    MatrixKB* mkb_{nullptr};
+    RunLoop* rl_{nullptr};
+    RecordEngine* re_{nullptr};
+    Transport* tx_{nullptr};
+    class ViewManager* vm_{nullptr};
 };

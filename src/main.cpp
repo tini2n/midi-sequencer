@@ -17,6 +17,7 @@
 #include "ui/views/generative_view.hpp"
 #include "io/serial_monitor_input.hpp"
 #include "io/encoder_manager.hpp"
+#include "io/matrix_kb.hpp"
 
 static constexpr uint16_t PPQN = 96;
 static inline uint32_t ticksPerStep(uint16_t gridDiv) { return (uint32_t(PPQN) * 4u) / gridDiv; }
@@ -31,14 +32,14 @@ static inline uint32_t ticksPerStep(uint16_t gridDiv) { return (uint32_t(PPQN) *
 // ENC7: A=22, B=23, SW=30
 // ENC8: A=24, B=25, SW=31
 const EncoderManager::PinConfig ENCODER_PINS[8] = {
-    {2,  3,  0},   // ENC1
-    {4,  5,  12},  // ENC2
-    {6,  7,  26},  // ENC3
-    {14, 15, 27},  // ENC4
-    {16, 17, 28},  // ENC5
-    {20, 21, 29},  // ENC6
-    {22, 23, 30},  // ENC7
-    {24, 25, 31}   // ENC8
+    {2, 3, 0},    // ENC1
+    {4, 5, 12},   // ENC2
+    {6, 7, 26},   // ENC3
+    {14, 15, 27}, // ENC4
+    {16, 17, 28}, // ENC5
+    {20, 21, 29}, // ENC6
+    {22, 23, 30}, // ENC7
+    {24, 25, 31}  // ENC8
 };
 
 TickScheduler sched;
@@ -54,7 +55,7 @@ PerformanceView performanceView;
 GenerativeView generativeView;
 RecordEngine recorder;
 SerialMonitorInput serialIn;
-
+MatrixKB matrixKB; // Shared hardware controller
 
 static uint16_t visibleSteps = 16; // S ∈ {1,2,4,8,16,32,64}
 
@@ -89,18 +90,24 @@ void setup()
   runner.begin(&sched, &transport, &engine, &midi, &pat);
   recorder.begin(&pat, &transport);
   
-  // Initialize views
+  // Initialize shared matrix keyboard
+  MatrixKB::Config kbConfig;
+  kbConfig.address = cfg::PCF_ADDRESS;
+  matrixKB.begin(kbConfig, 0, 4, 100);
+  matrixKB.attach(&runner, &recorder, &transport);
+  matrixKB.attachViewManager(&viewManager);
+  
+  // Initialize view system
   viewManager.registerView(ViewType::Performance, &performanceView);
   viewManager.registerView(ViewType::Generative, &generativeView);
-  viewManager.beginAll(pat.track.channel);
-  viewManager.attachAll(&runner, &recorder, &transport); // Now includes ViewManager attachment
   
-  // Initialize encoders
-  viewManager.beginEncoders(ENCODER_PINS, cfg::ENCODER_DEBOUNCE_US);
-  Serial.println("Encoders initialized:");
-  Serial.println("  ENC1 (Root/Density) - ENC2 (Octave/Length) - ENC3 (Scale/BaseNote)");
-  Serial.println("  ENC4 (Switch Gen) - ENC5-8 (Reserved)");
+  // Inject shared MatrixKB into views
+  performanceView.setMatrixKB(&matrixKB);
+  generativeView.setMatrixKB(&matrixKB);
   
+  viewManager.initialize(&runner, &recorder, &transport, &pat, pat.track.channel,
+                         ENCODER_PINS, cfg::ENCODER_DEBOUNCE_US);
+
   serialIn.attach(&runner, &transport, &pat, &vp, &viewManager, &performanceView);
 }
 
@@ -109,10 +116,10 @@ void loop()
   // Run clock & transport and generate events
   runner.service();
 
-  // UI input and rendering
-  viewManager.poll(midi);
-  // Serial monitor ghost controls
-  serialIn.poll(midi);
+  // UI input
+  viewManager.pollKB(midi);
+  viewManager.pollEncoders();
+  serialIn.poll(midi); // Serial monitor controls
 
   // Draw
   static uint32_t nextDraw = 0;
@@ -120,6 +127,6 @@ void loop()
   if ((int32_t)(now - nextDraw) >= 0)
   {
     viewManager.draw(pat, vp, oled, midi, now, transport.playTick());
-    nextDraw = now + 50000; // 20 FPS
+    nextDraw = now + 10000; // ~33Hz
   }
 }

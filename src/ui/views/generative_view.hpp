@@ -7,6 +7,12 @@
 #include "io/encoder_manager.hpp"
 #include "config.hpp"
 
+#include "engine/generator_manager.hpp"
+#include "ui/views/base_view.hpp"
+
+#include "io/matrix_kb.hpp"
+#include "io/encoder_manager.hpp"
+
 /**
  * Generative view for algorithmic pattern creation.
  * Pure UI/rendering class that delegates all generation logic to GeneratorManager.
@@ -41,12 +47,15 @@ public:
     void onEncoderButton(const EncoderButtonEvent& event) override;
 
 private:
-    MatrixKB mkb_{};
+    MatrixKB* mkb_{nullptr};
     RunLoop* runLoop_{nullptr};
     RecordEngine* recordEngine_{nullptr};
     Transport* transport_{nullptr};
     GeneratorManager generatorManager_;
     uint8_t midiChannel_{1};
+    
+    // Cached edit pitch (updated when encoder changes, not in draw)
+    uint8_t cachedEditPitch_{60};
     
     // UI state
     bool isGenerating_{false};
@@ -54,4 +63,7 @@ private:
     
     // UI helpers
     void drawHUD(char* buffer, size_t bufferSize) const;
+
+public:
+    void setMatrixKB(MatrixKB* mkb) { mkb_ = mkb; }
 };
