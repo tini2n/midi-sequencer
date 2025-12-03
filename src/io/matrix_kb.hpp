@@ -13,10 +13,10 @@ public:
     struct Config
     {
         uint8_t address = 0x20; // I2C address of PCF8575
-        uint8_t rows[3] = {10, 11, 12};
-        uint8_t cols[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-        uint8_t rowTop = 1, rowBot = 2, rowCtl = 0;
-        uint32_t debounce_us = 3000;
+        uint8_t rows[3] = {10, 11, 12};  // Row drive pins
+        uint8_t cols[8] = {0, 1, 2, 3, 4, 5, 6, 7};  // Column sense pins
+        uint8_t rowTop = 1, rowBot = 2, rowCtl = 0;  // Row indices
+        uint32_t debounce_us = 5000;  // Increased from 3ms to 5ms for stability
     };
     bool begin(const Config &c, uint8_t root = 0, int8_t octave = 4, uint8_t vel = 100)
     {
@@ -73,39 +73,64 @@ public:
 
     void poll(MidiIO &midi, uint8_t ch, int *lastPitchOpt = nullptr)
     {
-        uint32_t now = micros();
+        uint32_t scanStart = micros();
+        
+        // Throttle to max 200Hz (5ms interval) to reduce I2C bus load
+        if ((int32_t)(scanStart - lastScanUs_) < 5000) {
+            return;
+        }
+        lastScanUs_ = scanStart;
+        
+        // Scan each row
         for (uint8_t r = 0; r < 3; r++)
         {
-            driveRow(r);
-            // Allow signals to settle like in the smoke test (~80us)
-            delayMicroseconds(80);
-            uint16_t pins = 0xFFFF;
-            if (!pcf_.read(pins))
-            {
-                // If read fails, skip this row to avoid false triggers
+            // Drive row low, others high
+            if (!driveRow(r)) {
                 continue;
             }
-            // columns pressed = 0
+            
+            // Wait for signals to settle (matrix RC time + PCF8575 propagation)
+            delayMicroseconds(200);
+            
+            // Read column states
+            uint16_t pins = 0xFFFF;
+            if (!pcf_.read(pins)) {
+                continue;
+            }
+            
+            // Process each column
             for (uint8_t c = 0; c < 8; c++)
             {
+                // Take a fresh timestamp per key evaluation
+                uint32_t now = micros();
+                
                 bool down = ((pins >> cfg_.cols[c]) & 1) == 0;
                 int btn = rowToBtn(r, c);
                 if (btn < 0)
                     continue;
+                    
+                // Debouncing
                 uint32_t &deb = (r == cfg_.rowCtl) ? debCtlUntil_[c] : debUntil_[btn];
-                if (now < deb)
+                if ((int32_t)(now - deb) < 0) {
                     continue;
+                }
+                
                 bool last = lastDown_[r][c];
-                if (down == last)
+                if (down == last) {
                     continue;
+                }
+                
+                // State changed
                 lastDown_[r][c] = down;
                 deb = now + cfg_.debounce_us;
+                
                 if (r == cfg_.rowCtl)
                 {
                     onControl(c, down);
                     continue;
                 }
-                // musical rows: emit note on at press, note off at release
+                
+                // Musical keys
                 if (down)
                 {
                     noteOn(btn, midi, ch, lastPitchOpt);
@@ -116,24 +141,21 @@ public:
                 }
             }
         }
+        
+        // Restore all pins high (inputs)
+        pcf_.write(0xFFFF);
     }
 
 private:
     PCF8575 pcf_;
     Config cfg_;
+    uint32_t lastScanUs_{0};
 
-    void driveRow(uint8_t r)
+    bool driveRow(uint8_t r)
     {
-        uint16_t v = 0xFFFF; // all high (inputs)
-        // active row driven low
-        v &= ~(1u << cfg_.rows[r]);
-        // non-active rows high
-        for (uint8_t i = 0; i < 3; i++)
-        {
-            if (i != r)
-                v |= (1u << cfg_.rows[i]);
-        }
-        pcf_.write(v);
+        uint16_t v = 0xFFFF;
+        v &= ~(1u << cfg_.rows[r]); // Drive active row low
+        return pcf_.write(v);
     }
 
     int rowToBtn(uint8_t r, uint8_t c) const

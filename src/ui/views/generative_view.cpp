@@ -1,5 +1,100 @@
 #include "generative_view.hpp"
 
+void GenerativeView::onEncoderRotation(const EncoderRotationEvent& event)
+{
+    Generator* gen = generatorManager_.getCurrentGenerator();
+    if (!gen) return;
+    
+    switch (event.encoderId)
+    {
+        case 0: // ENC1: Density parameter
+        {
+            float density = 0;
+            if (gen->getParameter("density", density))
+            {
+                density += event.delta * 5.0f; // Step by 5
+                if (density < 0) density = 0;
+                if (density > 100) density = 100;
+                generatorManager_.setParameter("density", density);
+                Serial.printf("[GenerativeView] ENC1 Density: %.0f\n", density);
+            }
+            break;
+        }
+        case 1: // ENC2: Length parameter
+        {
+            float length = 0;
+            if (gen->getParameter("length", length))
+            {
+                length += event.delta;
+                if (length < 1) length = 1;
+                if (length > 64) length = 64;
+                generatorManager_.setParameter("length", length);
+                Serial.printf("[GenerativeView] ENC2 Length: %.0f\n", length);
+            }
+            break;
+        }
+        case 2: // ENC3: Base note parameter
+        {
+            float baseNote = 0;
+            if (gen->getParameter("base_note", baseNote))
+            {
+                baseNote += event.delta;
+                if (baseNote < 0) baseNote = 0;
+                if (baseNote > 127) baseNote = 127;
+                generatorManager_.setParameter("base_note", baseNote);
+                Serial.printf("[GenerativeView] ENC3 Base Note: %.0f\n", baseNote);
+            }
+            break;
+        }
+        case 3: // ENC4: Switch generator
+        {
+            if (event.delta > 0)
+                switchToNextGenerator();
+            else if (event.delta < 0)
+                switchToPreviousGenerator();
+            break;
+        }
+        case 4: // ENC5-8: Reserved for future parameters
+        case 5:
+        case 6:
+        case 7:
+        {
+            Serial.printf("[GenerativeView] ENC%d delta: %d (not assigned)\n", 
+                         event.encoderId + 1, event.delta);
+            break;
+        }
+    }
+}
+
+void GenerativeView::onEncoderButton(const EncoderButtonEvent& event)
+{
+    if (event.pressed)
+    {
+        switch (event.encoderId)
+        {
+            case 0: // ENC1 SW: Reset density to default
+            case 1: // ENC2 SW: Reset length to default
+            case 2: // ENC3 SW: Reset base_note to default
+            {
+                resetToDefaults();
+                Serial.printf("[GenerativeView] ENC%d SW: Reset all to defaults\n", 
+                             event.encoderId + 1);
+                break;
+            }
+            case 3: // ENC4 SW: List available generators
+                generatorManager_.printAvailableGenerators();
+                break;
+            case 4: // ENC5-8 SW: Reserved
+            case 5:
+            case 6:
+            case 7:
+                Serial.printf("[GenerativeView] ENC%d SW pressed (not assigned)\n", 
+                             event.encoderId + 1);
+                break;
+        }
+    }
+}
+
 void GenerativeView::begin(uint8_t midiChannel)
 {
     midiChannel_ = midiChannel;

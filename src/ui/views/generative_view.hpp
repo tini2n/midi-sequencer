@@ -2,8 +2,9 @@
 #include <Arduino.h>
 
 #include "ui/views/base_view.hpp"
-#include "ui/cursor/matrix_kb.hpp"
+#include "io/matrix_kb.hpp"
 #include "engine/generator_manager.hpp"
+#include "io/encoder_manager.hpp"
 #include "config.hpp"
 
 /**
@@ -11,7 +12,7 @@
  * Pure UI/rendering class that delegates all generation logic to GeneratorManager.
  * Responsible only for displaying generator status and handling input.
  */
-class GenerativeView : public IView
+class GenerativeView : public IView, public IEncoderHandler
 {
 public:
     // IView interface implementation
@@ -24,6 +25,8 @@ public:
     void onActivate() override;
     void onDeactivate() override;
     const char* getName() const override { return "Generative"; }
+    
+    IEncoderHandler* getEncoderHandler() override { return this; }
 
     // Generative-specific methods
     void triggerGeneration(Pattern& pattern);
@@ -32,6 +35,10 @@ public:
     void resetToDefaults();
     
     GeneratorManager& getGeneratorManager() { return generatorManager_; }
+    
+    // IEncoderHandler interface
+    void onEncoderRotation(const EncoderRotationEvent& event) override;
+    void onEncoderButton(const EncoderButtonEvent& event) override;
 
 private:
     MatrixKB mkb_{};

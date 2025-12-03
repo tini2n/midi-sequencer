@@ -1,6 +1,4 @@
 #include "view_manager.hpp"
-#include "performance_view.hpp"
-#include "generative_view.hpp"
 
 void ViewManager::registerView(ViewType viewType, IView* view)
 {
@@ -66,6 +64,11 @@ bool ViewManager::switchToView(ViewType viewType)
     // Activate new view
     if (currentView_ != nullptr) {
         currentView_->onActivate();
+        
+        // Set encoder handler for the newly activated view if encoders are initialized
+        if (encodersInitialized_) {
+            encoderMgr_.setHandler(currentView_->getEncoderHandler());
+        }
     }
     
     Serial.printf("Switched to view: %s\n", getCurrentViewName());
@@ -109,6 +112,25 @@ void ViewManager::poll(MidiIO& midi)
     if (currentView_ != nullptr) {
         currentView_->poll(midi);
     }
+    
+    // Poll encoders if initialized
+    if (encodersInitialized_) {
+        pollEncoders();
+    }
+}
+
+void ViewManager::beginEncoders(const EncoderManager::PinConfig configs[EncoderManager::NUM_ENCODERS], 
+                                uint32_t debounceUs)
+{
+    encoderMgr_.begin(configs, debounceUs);
+    encodersInitialized_ = true;
+    Serial.println("Encoder manager initialized");
+}
+
+void ViewManager::pollEncoders()
+{
+    // Handler was already set in activateView(), just poll
+    encoderMgr_.poll();
 }
 
 const char* ViewManager::getCurrentViewName() const
