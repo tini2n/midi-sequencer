@@ -66,6 +66,12 @@ public:
      * Get human-readable name for this view (for UI display).
      */
     virtual const char* getName() const = 0;
+
+    /**
+     * Get encoder handler interface for this view.
+     * @return Pointer to IEncoderHandler implementation, or nullptr if view doesn't handle encoders
+     */
+    virtual class IEncoderHandler* getEncoderHandler() { return nullptr; }
 };
 
 /**

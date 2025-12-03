@@ -25,6 +25,8 @@ public:
     void onActivate() override;
     void onDeactivate() override;
     const char* getName() const override { return "Generative"; }
+    
+    IEncoderHandler* getEncoderHandler() override { return this; }
 
     // Generative-specific methods
     void triggerGeneration(Pattern& pattern);

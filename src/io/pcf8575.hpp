@@ -53,10 +53,11 @@ public:
     {
         Wire.requestFrom(address_, (uint8_t)2);
         
-        // Wait for data with short timeout
         uint32_t start = micros();
         while (Wire.available() < 2) {
             if ((int32_t)(micros() - start) > 1000) { // 1ms timeout
+            // Flush any stray bytes to avoid corrupting next read
+            while (Wire.available() > 0) { (void)Wire.read(); }
                 return false;
             }
         }
@@ -64,6 +65,8 @@ public:
         uint8_t lo = Wire.read();
         uint8_t hi = Wire.read();
         value = (uint16_t)lo | ((uint16_t)hi << 8);
+        // Drain any unexpected extra bytes defensively
+        while (Wire.available() > 0) { (void)Wire.read(); }
         return true;
     }
 

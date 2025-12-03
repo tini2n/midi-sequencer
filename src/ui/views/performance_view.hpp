@@ -52,6 +52,8 @@ public:
     }
     
     const char* getName() const override { return "Performance"; }
+    
+    IEncoderHandler* getEncoderHandler() override { return this; }
 
     // Performance-specific methods
     void setRoot(uint8_t semis) { mkb_.setRoot(semis); st_.root = semis % 12; }
