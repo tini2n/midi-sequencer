@@ -81,10 +81,6 @@ public:
                 switchPressed_ = sw; // True on press edge
                 debounceUntil_ = now + debounceUs_;
             }
-            else
-            {
-                switchPressed_ = false; // Clear edge flag after read
-            }
         }
         
         return result;
