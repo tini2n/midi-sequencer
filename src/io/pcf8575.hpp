@@ -1,18 +1,28 @@
 #pragma once
+#include <Arduino.h>
 #include <Wire.h>
 
 /**
  * PCF8575 I2C I/O Expander Driver
  * Optimized for matrix keyboard scanning with minimal overhead.
+ * begin() optionally initializes Wire so callers don't have to duplicate
+ * setup code across sketches/tests.
  */
 class PCF8575
 {
 public:
-    bool begin(uint8_t address = 0x20)
+    bool begin(uint8_t address = 0x20, bool initWire = true, uint32_t wireClock = 400000)
     {
         address_ = address;
-        // Note: Wire.begin() and Wire.setClock() must be called in main.cpp
-        // before calling this method
+
+        if (initWire)
+        {
+            Wire.begin();
+            if (wireClock)
+            {
+                Wire.setClock(wireClock);
+            }
+        }
         
         out_ = 0xFFFF;
         
