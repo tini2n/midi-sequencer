@@ -11,31 +11,27 @@
 class PCF8575
 {
 public:
-    bool begin(uint8_t address = 0x20, bool initWire = true, uint32_t wireClock = 400000)
+    bool begin(uint8_t address = 0x20, uint32_t wireClock = 400000)
     {
         address_ = address;
 
-        if (initWire)
-        {
-            Wire.begin();
-            if (wireClock)
-            {
-                Wire.setClock(wireClock);
-            }
-        }
-        
+        Wire.begin();
+        Wire.setClock(wireClock);
+
         out_ = 0xFFFF;
-        
+
         // Verify device is present
         Wire.beginTransmission(address_);
         uint8_t result = Wire.endTransmission();
-        if (result != 0) {
+        if (result != 0)
+        {
             Serial.printf("PCF8575 not found at 0x%02X (error=%u)\n", address_, result);
             return false;
         }
-        
+
         // Initialize all pins as inputs (high)
-        if (!write(0xFFFF)) {
+        if (!write(0xFFFF))
+        {
             Serial.printf("PCF8575 initial write failed at 0x%02X\n", address_);
             return false;
         }
@@ -51,8 +47,9 @@ public:
         Wire.beginTransmission(address_);
         Wire.write((uint8_t)(value & 0xFF));
         Wire.write((uint8_t)(value >> 8));
-        
-        if (Wire.endTransmission() == 0) {
+
+        if (Wire.endTransmission() == 0)
+        {
             out_ = value;
             return true;
         }
@@ -65,21 +62,29 @@ public:
     bool read(uint16_t &value)
     {
         Wire.requestFrom(address_, (uint8_t)2);
-        
+
         uint32_t start = micros();
-        while (Wire.available() < 2) {
-            if ((int32_t)(micros() - start) > 1000) { // 1ms timeout
-            // Flush any stray bytes to avoid corrupting next read
-            while (Wire.available() > 0) { (void)Wire.read(); }
+        while (Wire.available() < 2)
+        {
+            if ((int32_t)(micros() - start) > 1000)
+            { // 1ms timeout
+                // Flush any stray bytes to avoid corrupting next read
+                while (Wire.available() > 0)
+                {
+                    (void)Wire.read();
+                }
                 return false;
             }
         }
-        
+
         uint8_t lo = Wire.read();
         uint8_t hi = Wire.read();
         value = (uint16_t)lo | ((uint16_t)hi << 8);
         // Drain any unexpected extra bytes defensively
-        while (Wire.available() > 0) { (void)Wire.read(); }
+        while (Wire.available() > 0)
+        {
+            (void)Wire.read();
+        }
         return true;
     }
 
