@@ -1,6 +1,8 @@
-# Exec Plan 02 — Generator Redesign
+# Exec Plan 04 — Generator Redesign
 
-**Status:** Not started (depends on 01-data-model)
+> **Note:** Renumbered from 02 → 04. Now Phase 4 in the roadmap (after core pipeline and recording).
+
+**Status:** Not started (depends on 01-data-model, 02-core-pipeline, 03-recording)
 **Goal:** Fix parameter system, remove heap, make generation non-destructive.
 **Touches:** `src/engine/generator.hpp`, `src/engine/euclidean_generator.*`, `src/engine/generator_manager.*`
 

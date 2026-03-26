@@ -1,71 +1,35 @@
 # Exec Plan 01 — Data Model Redesign
 
-**Status:** Not started
+**Status:** ✓ COMPLETE
 **Goal:** Replace heap-allocated model with fixed-size, embedded-safe types.
-**Touches:** `src/model/`, `src/engine/playback_engine.hpp`, `src/engine/record_engine.hpp`
+**Touches:** `src/model/`, `src/ui/viewport.hpp`
 
 ---
 
 ## Steps
 
-### 1. Define `NotePool<N>` in `src/model/note_pool.hpp`
+### 1. ✓ Define `Note` in `src/model/note.hpp`
 
-```cpp
-template <size_t N>
-struct NotePool {
-    Note notes[N];
-    uint16_t count{0};
+### 2. ✓ Define `NotePool<N>` in `src/model/note_pool.hpp`
 
-    bool push(const Note& n) {
-        if (count >= N) return false;
-        notes[count++] = n;
-        return true;
-    }
-    void clear() { count = 0; }
-    void sortByOnTick(); // insertion sort, N <= 256 is fine
-    Note* begin() { return notes; }
-    Note* end()   { return notes + count; }
-    const Note* begin() const { return notes; }
-    const Note* end()   const { return notes + count; }
-};
-```
+### 3. ✓ Define `LayeredTrack` in `src/model/track.hpp`
 
-### 2. Define `LayeredTrack` in `src/model/track.hpp`
+`NotePool<256> recorded` + `NotePool<128> generative` + `uint8_t channel`.
 
-Replace `std::vector<Note> notes` with:
-```cpp
-struct LayeredTrack {
-    NotePool<256> recorded;
-    NotePool<128> generative;
-    uint8_t channel{1};
-};
-```
-Remove `sortByTime()` — `NotePool::sortByOnTick()` covers it.
+### 4. ✓ Define `Pattern` in `src/model/pattern.hpp`
 
-### 3. Update `Pattern`
+`LayeredTrack tracks[16]` (16-track Digitakt-style). Each track has an optional `steps` override for polyrhythm (TODO, reserved field). `ticks()` = `ticksPerStep(grid) * steps`.
 
-`Track track` → `LayeredTrack track`. No other change to `Pattern`.
+### 5. ✓ Define `Scale` in `src/model/scale.hpp`
 
-### 4. Update `PlaybackEngine::processTick`
+8 scales (None, Major, Minor, Dorian, Phrygian, Lydian, PentaMajor, PentaMinor). 12-bit bitmask per scale for O(1) `contains()`. Correct `degreeCount()` for pentatonic (5, not 7).
 
-Iterate both `track.recorded` and `track.generative`.
-Add cursor fields (`recCursor_`, `genCursor_`) for O(1) advance.
-See `docs/design-docs/memory-model.md`.
+### 6. ✓ Define `Viewport` in `src/ui/viewport.hpp`
 
-### 5. Update `RecordEngine`
-
-`pat_->track.notes.push_back(n)` → `pat_->track.recorded.push(n)`.
-Replace `std::unordered_map<uint8_t, Pending>` with `Pending pending_[128]` + `bool active_[128]`.
-
-### 6. Verify
-
-- Compile with PlatformIO `teensy41` env.
-- Run `test/legacy_main.cpp` wiring mentally: all accessors still valid.
-- No `std::vector`, `std::map`, `new` in `model/` or `engine/`.
+Moved to `src/ui/` (not model — UI-only concept). Removed legacy `grid` field (belongs on Pattern). Added `pixelsPerTick()` helper. No heap, no model dependency.
 
 ---
 
-## Out of Scope for This Step
+## Result
 
-- Generator redesign (Phase 2)
-- Scale changes (Phase 4)
+All files created. No `std::vector`, `std::map`, or `new` anywhere in `src/model/` or `src/ui/viewport.hpp`. Ready for Phase 2.

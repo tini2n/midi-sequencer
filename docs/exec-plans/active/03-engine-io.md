@@ -1,6 +1,10 @@
 # Exec Plan 03 — Engine & IO Fixes
 
-**Status:** Not started (depends on 01 and 02)
+> **Note:** This plan's content has been absorbed into `02-core-pipeline.md` (PlaybackEngine cursor,
+> MidiIO ring buffer, Serial debug gating). This file is superseded and kept for reference only.
+> Do not use as an active plan — follow `02-core-pipeline.md` instead.
+
+**Status:** Superseded by 02-core-pipeline.md
 **Goal:** O(1) playback scan, ring-buffer MIDI queue, no Serial in hot paths.
 **Touches:** `src/engine/playback_engine.hpp`, `src/core/midi_io.hpp`
 
