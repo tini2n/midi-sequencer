@@ -1,6 +1,6 @@
 # Exec Plan 02 — Core MIDI Pipeline
 
-**Status:** Not started (depends on 01-data-model)
+**Status:** ✓ COMPLETE
 **Goal:** Get a note playing end-to-end: hardcoded pattern → tick → MIDI byte out. First proof-of-life.
 **Touches:** `src/core/`, `src/engine/playback_engine.hpp`, `src/engine/record_engine.hpp`, `src/app.cpp`
 

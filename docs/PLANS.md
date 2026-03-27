@@ -23,33 +23,37 @@ Exec plan: `exec-plans/active/01-data-model.md`
 
 ---
 
-## Phase 2 — Core MIDI pipeline (current)
+## Phase 2 — Core MIDI pipeline ✓ COMPLETE
 
 **Goal:** Get a note playing end-to-end: hardcoded pattern → tick → MIDI byte out. First proof-of-life.
 
-- [ ] Port `RingBufferSPSC<T,N>` to `src/core/ring_buffer.hpp` (legacy version is correct; verify, port)
-- [ ] Port `Timebase` / `TickEvent` / `Tempo` to `src/core/timebase.hpp`
-- [ ] Port `TickScheduler` to `src/core/tick_scheduler.hpp` (ISR → ring buffer; already correct design)
-- [ ] Port `Transport` to `src/core/transport.hpp` (clean state machine; port with minor fixes)
-- [ ] Rewrite `MidiIO` in `src/core/midi_io.hpp` — fix O(n) queue pop → `RingBufferSPSC<Q,32>`; gate all `Serial.printf` behind `SEQUENCER_DEBUG`
-- [ ] Rewrite `PlaybackEngine` in `src/engine/playback_engine.hpp` — cursor-based O(1) tick scan, iterates both `LayeredTrack` pools
-- [ ] Rewrite `RunLoop` in `src/core/runloop.hpp` — remove `std::vector<MidiEvent>`, replace with fixed-size buffer; wire tick drain → PlaybackEngine → MidiIO
-- [ ] Wire into `src/app.cpp` `setup()`/`update()` — hardcode a test pattern, verify MIDI output
+- [x] Port `RingBufferSPSC<T,N>` to `src/core/ring_buffer.hpp`
+- [x] Port `Timebase` / `TickEvent` / `Tempo` to `src/core/timebase.hpp`
+- [x] Port `TickScheduler` to `src/core/tick_scheduler.hpp` (ISR → ring buffer)
+- [x] Port `Transport` to `src/core/transport.hpp` (phase-accumulator, `onTick()`)
+- [x] Rewrite `MidiIO` in `src/core/midi_io.hpp` — O(1) FIFO delay queue, no Serial in hot path
+- [x] Rewrite `PlaybackEngine` in `src/engine/playback_engine.hpp` — cursor-based O(1) scan, `active_[64]`
+- [x] Rewrite `RunLoop` in `src/core/runloop.hpp` — fixed buffer `MaxEvents=64`, `silenceAllTracks()` via CC
+- [x] Wire into `src/app.cpp` `setup()`/`update()`
 
-Exec plan: `exec-plans/active/02-core-pipeline.md` *(to be written)*
+Exec plan: `exec-plans/active/02-core-pipeline.md`
 
 ---
 
-## Phase 3 — Recording
+## Phase 3 — Step Sequencer ✓ COMPLETE
 
-**Goal:** Input notes from hardware, store in pattern, play back. Closes the record → playback loop.
+**Goal:** Digitakt-style step editor: 16 keyboard buttons = 16 step slots, toggle notes on/off. Serial monitor for hardware-free testing.
 
-- [ ] Rewrite `RecordEngine` in `src/engine/record_engine.hpp` — replace `std::unordered_map` with `Pending pending_[128]` + `bool active_[128]`; writes to `track.recorded`
-- [ ] Port `PCF8575` I2C driver to `src/io/pcf8575.hpp`
-- [ ] Port `MatrixKB` to `src/io/matrix_kb.hpp` — gate all `Serial.printf` behind `SEQUENCER_DEBUG`; connect to `RecordEngine`
-- [ ] Port `Encoder` to `src/io/encoder.hpp` (already heap-free; minor cleanup)
-- [ ] Port `EncoderManager` to `src/io/encoder_manager.hpp`
-- [ ] Verify: play notes on keyboard → notes stored → play back via MIDI out
+- [x] Reduce to `MAX_TRACKS = 2` (saves ~80KB RAM1 vs 16 tracks)
+- [x] Port `PCF8575` I2C driver to `src/io/pcf8575.hpp` (Serial behind `SEQUENCER_DEBUG`)
+- [x] Port `IMatrixKBMode` interface to `src/io/matrix_kb_mode.hpp`
+- [x] Implement `CursorMode` in `src/io/cursor_mode.hpp/.cpp` — page offset (enc 0), edit pitch (enc 1), ASCII step grid after every edit
+- [x] Port `MatrixKB` to `src/io/matrix_kb.hpp/.cpp` — CTL 0 = toggle track, CTL 1 = play, CTL 2 = stop
+- [x] Port `Encoder` + `EncoderManager` to `src/io/encoder.hpp/.hpp`
+- [x] Write `SerialMonitor` in `src/io/serial_monitor.hpp` — `p`, `T<bpm>`, `G<steps>`, `A<tr>,<pitch>,<step>`, `X<tr>,<step>`, `C<tr>`, `L`, `?`
+- [x] Wire `CursorMode`, `MatrixKB`, `EncoderManager`, `SerialMonitor` into `src/app.hpp/.cpp`
+
+Exec plan: `exec-plans/active/03-step-sequencer.md`
 
 ---
 
@@ -63,7 +67,7 @@ Exec plan: `exec-plans/active/02-core-pipeline.md` *(to be written)*
 - [ ] Hook `GeneratorManager::applyPendingSwap()` into `RunLoop` pre-tick-drain
 - [ ] Verify: generator fills `generative` layer; recorded notes survive a generate call
 
-Exec plan: `exec-plans/active/03-generator-redesign.md` *(renumbered from 02)*
+Exec plan: `exec-plans/active/04-generator-redesign.md`
 
 ---
 

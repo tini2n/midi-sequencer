@@ -58,8 +58,8 @@ private:
         uint8_t  pitch;
         uint32_t offTick; // pattern tick when note-off fires
     };
-    static constexpr uint8_t MaxActive = 32;
-    ActiveNote active_[MaxActive]{};
+    static constexpr uint8_t MaxActive = 64;
+    ActiveNote active_[64]{};
     uint8_t    activeCount_{0};
 
     // Advance cursor through a sorted NotePool, emitting note-ons for notes in (prev, curr].

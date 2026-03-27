@@ -17,7 +17,7 @@
 //   ticksPerStep(16) = (96 * 4) / 16 = 24 ticks per 1/16 step
 //   ticks()          = 24 * 64 = 1536 ticks = 4 bars in 4/4
 
-static constexpr uint8_t MAX_TRACKS = 16;
+static constexpr uint8_t MAX_TRACKS = 2; // 2 tracks for development (one per MIDI output channel)
 
 struct Pattern {
     LayeredTrack tracks[MAX_TRACKS];  // tracks[0..15], each on its own MIDI channel

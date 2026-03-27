@@ -92,7 +92,7 @@ private:
     MidiIO*         midi_{};
     Pattern*        pat_{};
 
-    static constexpr uint8_t MaxEvents = 32;
+    static constexpr uint8_t MaxEvents = 64;
     MidiEvent evBuf_[MaxEvents]{};
 
     static constexpr uint8_t MaxEvt = 8;
