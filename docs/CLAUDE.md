@@ -52,14 +52,24 @@ RunLoop::service() (called every Arduino loop())
 
 Key timing: PPQN=96, one 1/16 step = 24 ticks, one 4/4 bar = 384 ticks. Always use `timebase::ticksPerStep()` from `src/types.hpp` — never hardcode tick math.
 
-### Step Sequencer (Phase 3 — complete)
+### Step Sequencer & Control Surface (Phases 3–3.5 — complete)
 
 `CursorMode` implements Digitakt-style step editing:
 - 16 keyboard buttons map to 16 step slots. Press = toggle note on/off at that step.
-- `pageOffset_` (encoder 0): actual step = btn + pageOffset × 16. Lets you edit beyond 16 steps.
-- `trackIdx_` (0 or 1): which track is being edited. CTL 0 toggles between tracks.
-- `editPitch_` (encoder 1): MIDI note assigned to new trigs.
+- `pageOffset_` (K1/Enc 0): actual step = btn + pageOffset × 16. Lets you edit beyond 16 steps.
+- `editPitch_` (K2/Enc 1): MIDI note assigned to new trigs.
+- `trackIdx_` (CTL 5): toggle active track 0↔1.
 - After every note change, `printTrackState()` prints an ASCII step grid to Serial.
+
+**CTL buttons:** `[REC][PLAY][STOP][PG+][MODE][TRK][SET][SHF]` (indices 0–7)
+
+**Hold-step editing:** Hold a step button and turn K2/K3/K4 to edit pitch/velocity/micro-offset of that note live. `CursorMode::editHeld(param, delta, pat)` — called from `App::onEncoderRotation()` when `cursor_.getHeldStep() >= 0`.
+
+**Settings mode (CTL 6):** K1 controls BPM (±0.5 per detent; press = reset to 120). Toggle via `RunLoop::consumeSettingsToggle()` checked in `App::update()`.
+
+**K5 (Enc 4):** step count ±1 per detent; hold K5 button while turning = ±16 steps.
+
+Full control map: `docs/design-docs/control-map.md`.
 
 `SerialMonitor` enables hardware-free testing: `A0,60,0` adds a note, `L` shows the grid, `p` plays.
 

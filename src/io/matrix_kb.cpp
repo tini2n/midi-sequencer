@@ -73,28 +73,43 @@ void MatrixKB::onControl(uint8_t c, bool down) {
 
     if (!down) return;
 
+    CursorMode* cm  = mode_ ? static_cast<CursorMode*>(mode_) : nullptr;
+    Pattern*    pat = static_cast<Pattern*>(modeCtx_);
+
     switch (c) {
-    case 0: // Toggle active track (0 → 1 → 0)
-        if (mode_) {
-            CursorMode* cm = static_cast<CursorMode*>(mode_);
-            if (cm) {
-                uint8_t next = (cm->getTrack() + 1) % MAX_TRACKS;
-                cm->setTrack(next);
-                Serial.printf("[KB] track -> %u\n", next);
-            }
-        }
+    case 0: // REC — placeholder until real-time recording is implemented
+        Serial.println("[CTL] REC (not implemented)");
         break;
-    case 1: // Play / pause toggle
+    case 1: // PLAY / pause toggle
         if (rl_ && tx_) {
             bool running = tx_->isRunning();
             rl_->post(AppEvent{running ? AppEvent::Type::Pause : AppEvent::Type::Play});
         }
         break;
-    case 2: // Stop
+    case 2: // STOP
         if (rl_) rl_->post(AppEvent{AppEvent::Type::Stop});
         break;
-    case 6: // View switch — no-op until Phase 5
+    case 3: // NEXT PAGE (Shift = prev page)
+        if (cm && pat) {
+            uint8_t page = cm->getPage();
+            if (shift) cm->setPage(page > 0 ? page - 1 : 0, pat->steps);
+            else        cm->setPage(page + 1, pat->steps);
+        }
         break;
+    case 4: // MODE — cycle keyboard mode (only sequencer mode for now)
+        Serial.println("[CTL] MODE: sequencer");
+        break;
+    case 5: // TRACK — toggle active track 0↔1
+        if (cm) {
+            uint8_t next = (cm->getTrack() + 1) % MAX_TRACKS;
+            cm->setTrack(next);
+            Serial.printf("[CTL] track -> %u\n", next);
+        }
+        break;
+    case 6: // SETTINGS — toggle settings mode via RunLoop event
+        if (rl_) rl_->post(AppEvent{AppEvent::Type::ToggleSettings});
+        break;
+    // case 7: SHIFT — handled above by onControl(); never reaches here
     default:
         break;
     }

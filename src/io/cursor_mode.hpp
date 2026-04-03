@@ -42,6 +42,12 @@ public:
     uint8_t getPage()        const { return pageOffset_; }
     uint8_t getTrack()       const { return trackIdx_; }
     bool    isShiftPressed() const { return shiftPressed_; }
+    int8_t  getHeldStep()    const { return heldStep_; }
+
+    // Edit a property of the currently held step's note.
+    // param: 0=pitch, 1=velocity, 2=micro-offset (tick nudge).
+    // Safe to call even when no step is held (no-op).
+    void editHeld(uint8_t param, int8_t delta, Pattern& pat);
 
     // Print the current track state as an ASCII step grid to Serial.
     void printTrackState(const Pattern& pat) const;
@@ -58,6 +64,9 @@ private:
     uint8_t trackIdx_{0};    // which track is being edited (0 or 1)
     uint8_t selectedStep_{0};
     bool    shiftPressed_{false};
+
+    int8_t  heldStep_{-1};         // step button currently held (-1 = none)
+    bool    editedWhileHeld_{false}; // encoder moved during hold — suppress re-toggle on up
 
     Note    copyBuffer_{};
     bool    hasCopy_{false};

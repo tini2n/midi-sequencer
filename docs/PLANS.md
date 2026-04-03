@@ -57,6 +57,22 @@ Exec plan: `exec-plans/active/03-step-sequencer.md`
 
 ---
 
+## Phase 3.5 — Sequencer UX & Control Mapping ✓ COMPLETE
+
+**Goal:** Finalize all control surface mappings before adding generators. Full CTL remap, encoder layers, settings mode, hold-step note editing.
+
+- [x] CTL remap: `[REC][PLAY][STOP][PG+][MODE][TRK][SET][SHF]`
+- [x] Settings mode (CTL 6): K1 → BPM ±0.5; press K1 = reset to 120
+- [x] K5 encoder: step count ±1 (hold K5 + turn = ±16)
+- [x] Hold-step editing: hold step button → K2=pitch, K3=velocity, K4=micro-offset
+- [x] `AppEvent::ToggleSettings` + `RunLoop::consumeSettingsToggle()`
+- [x] `CursorMode::editHeld()` + `getHeldStep()`
+- [x] Control map reference doc: `docs/design-docs/control-map.md`
+
+Exec plan: `exec-plans/active/03-step-sequencer.md` (extended)
+
+---
+
 ## Phase 4 — Generator subsystem
 
 **Goal:** Non-destructive algorithmic note generation, writes to `generative` layer.

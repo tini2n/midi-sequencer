@@ -8,12 +8,21 @@ void CursorMode::onButtonDown(uint8_t btn, MidiIO& midi, uint8_t ch, void* conte
     if (!context || btn >= 16) return;
     Pattern* pat = static_cast<Pattern*>(context);
     uint8_t actualStep = btn + pageOffset_ * 16;
-    selectedStep_ = actualStep;
+    selectedStep_    = actualStep;
+    heldStep_        = (int8_t)actualStep;
+    editedWhileHeld_ = false;
     toggleStep(actualStep, *pat);
 }
 
 void CursorMode::onButtonUp(uint8_t btn, MidiIO& midi, uint8_t ch, void* context) {
-    (void)btn; (void)midi; (void)ch; (void)context;
+    (void)midi; (void)ch;
+    if (btn >= 16) return;
+    heldStep_        = -1;
+    editedWhileHeld_ = false;
+    // Print state refresh on release only if we edited (toggleStep already printed on down)
+    if (editedWhileHeld_ && context) {
+        printTrackState(*static_cast<Pattern*>(context));
+    }
 }
 
 void CursorMode::update(uint32_t now, void* context) {
@@ -63,7 +72,7 @@ void CursorMode::setPage(uint8_t page, uint8_t patternSteps) {
 
 void CursorMode::toggleStep(uint8_t step, Pattern& pat) {
     Note* existing = findNoteAtStep(step, pat);
-    NotePool<256>& pool = pat.tracks[trackIdx_].recorded;
+    NotePool<128>& pool = pat.tracks[trackIdx_].recorded;
 
     if (existing) {
         // Remove: find its index in the pool
@@ -111,7 +120,7 @@ void CursorMode::copyStep(Pattern& pat) {
 
 void CursorMode::pasteToStep(Pattern& pat) {
     if (!hasCopy_) { Serial.println("[Cursor] copy buffer empty"); return; }
-    NotePool<256>& pool = pat.tracks[trackIdx_].recorded;
+    NotePool<128>& pool = pat.tracks[trackIdx_].recorded;
     uint32_t tick = stepToTick(selectedStep_, pat);
 
     // Clear any existing note at this tick
@@ -132,7 +141,7 @@ void CursorMode::pasteToStep(Pattern& pat) {
 }
 
 void CursorMode::clearStep(Pattern& pat) {
-    NotePool<256>& pool = pat.tracks[trackIdx_].recorded;
+    NotePool<128>& pool = pat.tracks[trackIdx_].recorded;
     uint32_t tick = stepToTick(selectedStep_, pat);
     uint16_t before = pool.count;
     for (uint16_t i = 0; i < pool.count; ) {
@@ -150,7 +159,7 @@ void CursorMode::clearStep(Pattern& pat) {
 // ─── Serial state display ─────────────────────────────────────────────────────
 
 void CursorMode::printTrackState(const Pattern& pat) const {
-    const NotePool<256>& pool = pat.tracks[trackIdx_].recorded;
+    const NotePool<128>& pool = pat.tracks[trackIdx_].recorded;
     const uint8_t  ch    = pat.tracks[trackIdx_].channel;
     const uint8_t  start = pageOffset_ * 16;
     const uint8_t  end   = start + 16; // exclusive
@@ -195,7 +204,7 @@ void CursorMode::printTrackState(const Pattern& pat) const {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 Note* CursorMode::findNoteAtStep(uint8_t step, Pattern& pat) {
-    NotePool<256>& pool = pat.tracks[trackIdx_].recorded;
+    NotePool<128>& pool = pat.tracks[trackIdx_].recorded;
     uint32_t tick = stepToTick(step, pat);
     for (uint16_t i = 0; i < pool.count; ++i)
         if (pool.notes[i].on == tick) return &pool.notes[i];
@@ -206,6 +215,41 @@ uint32_t CursorMode::stepToTick(uint8_t step, const Pattern& pat) const {
     if (pat.steps == 0) return 0;
     uint8_t clamped = (step >= pat.steps) ? (pat.steps - 1) : step;
     return uint32_t(clamped) * (pat.ticks() / pat.steps);
+}
+
+void CursorMode::editHeld(uint8_t param, int8_t delta, Pattern& pat) {
+    if (heldStep_ < 0 || delta == 0) return;
+    Note* n = findNoteAtStep((uint8_t)heldStep_, pat);
+    if (!n) return;
+
+    editedWhileHeld_ = true;
+    NotePool<128>& pool = pat.tracks[trackIdx_].recorded;
+
+    switch (param) {
+    case 0: { // pitch
+        int16_t p = (int16_t)n->pitch + delta;
+        n->pitch = (uint8_t)(p < 0 ? 0 : (p > 127 ? 127 : p));
+        char buf[5];
+        Serial.printf("[Hold] step%d pitch -> %s\n", heldStep_, pitchName(n->pitch, buf, sizeof(buf)));
+        break;
+    }
+    case 1: { // velocity
+        int16_t v = (int16_t)n->vel + delta;
+        n->vel = (uint8_t)(v < 1 ? 1 : (v > 127 ? 127 : v));
+        Serial.printf("[Hold] step%d vel -> %u\n", heldStep_, n->vel);
+        break;
+    }
+    case 2: { // micro-offset (tick nudge)
+        int32_t t = (int32_t)n->on + delta;
+        n->on = (uint32_t)(t < 0 ? 0 : t);
+        pool.sortByOnTick();
+        Serial.printf("[Hold] step%d tick -> %lu\n", heldStep_, (unsigned long)n->on);
+        break;
+    }
+    default:
+        break;
+    }
+    printTrackState(pat);
 }
 
 const char* CursorMode::pitchName(uint8_t pitch, char* buf, uint8_t bufLen) {

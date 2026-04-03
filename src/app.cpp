@@ -64,24 +64,59 @@ void App::update() {
     kb_.poll(midi_, pat_.tracks[cursor_.getTrack()].channel);
     enc_.poll();
     loop_.service();
+
+    // Handle settings mode toggle (posted from CTL 6 via RunLoop event)
+    if (loop_.consumeSettingsToggle()) {
+        settingsMode_ = !settingsMode_;
+        if (settingsMode_) Serial.printf("[SET] on   BPM=%.1f\n", pat_.tempo);
+        else               Serial.println("[SET] off");
+    }
 }
 
 // ─── Encoder routing ──────────────────────────────────────────────────────────
 
 void App::onEncoderRotation(const EncoderRotationEvent& e) {
+    bool stepHeld = cursor_.getHeldStep() >= 0;
+
     switch (e.encoderId) {
-    case 0: // Page offset
-        cursor_.setPage(
-            (uint8_t)((int)cursor_.getPage() + e.delta < 0
-                ? 0
-                : cursor_.getPage() + e.delta),
-            pat_.steps);
+    case 0: // K1 — page offset; or BPM in settings mode
+        if (settingsMode_) {
+            float bpm = pat_.tempo + e.delta * 0.5f;
+            if (bpm < 20.f)  bpm = 20.f;
+            if (bpm > 300.f) bpm = 300.f;
+            pat_.tempo = bpm;
+            tx_.setTempo(bpm);
+            Serial.printf("[SET] BPM=%.1f\n", bpm);
+        } else {
+            int pg = (int)cursor_.getPage() + e.delta;
+            cursor_.setPage((uint8_t)(pg < 0 ? 0 : pg), pat_.steps);
+        }
         break;
-    case 1: { // Edit pitch
-        int p = (int)cursor_.getEditPitch() + e.delta;
-        if (p < 0)   p = 0;
-        if (p > 127) p = 127;
-        cursor_.setEditPitch((uint8_t)p);
+    case 1: { // K2 — edit pitch; or held-step pitch edit
+        if (stepHeld) {
+            cursor_.editHeld(0, e.delta, pat_);
+        } else {
+            int p = (int)cursor_.getEditPitch() + e.delta;
+            if (p < 0)   p = 0;
+            if (p > 127) p = 127;
+            cursor_.setEditPitch((uint8_t)p);
+        }
+        break;
+    }
+    case 2: // K3 — held-step velocity edit (reserved otherwise)
+        if (stepHeld) cursor_.editHeld(1, e.delta, pat_);
+        break;
+    case 3: // K4 — held-step micro-offset (reserved; zoom in Phase 5)
+        if (stepHeld) cursor_.editHeld(2, e.delta, pat_);
+        break;
+    case 4: { // K5 — step count (±1, or ±16 if button held)
+        int delta = k5Held_ ? e.delta * 16 : e.delta;
+        int steps = (int)pat_.steps + delta;
+        if (steps < 1)   steps = 1;
+        if (steps > 255) steps = 255;
+        pat_.steps = (uint8_t)steps;
+        tx_.setLoopLen(pat_.ticks());
+        Serial.printf("[K5] steps=%u  ticks=%lu\n", pat_.steps, (unsigned long)pat_.ticks());
         break;
     }
     default:
@@ -90,10 +125,19 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
 }
 
 void App::onEncoderButton(const EncoderButtonEvent& e) {
-    if (!e.pressed) return;
     switch (e.encoderId) {
-    case 0: cursor_.setPage(0, pat_.steps); break;          // reset page to 0
-    case 1: cursor_.setEditPitch(60); break;                // reset pitch to C4
-    default: break;
+    case 0:
+        if (!e.pressed) break;
+        if (settingsMode_) { pat_.tempo = 120.f; tx_.setTempo(120.f); Serial.println("[SET] BPM reset to 120"); }
+        else               { cursor_.setPage(0, pat_.steps); }
+        break;
+    case 1:
+        if (e.pressed) cursor_.setEditPitch(60);  // reset pitch to C4
+        break;
+    case 4:
+        k5Held_ = e.pressed;  // track hold state for ±16 step mode
+        break;
+    default:
+        break;
     }
 }

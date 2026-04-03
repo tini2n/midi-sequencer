@@ -7,7 +7,7 @@
 
 // Application-level events posted from UI or input handlers.
 struct AppEvent {
-    enum class Type : uint8_t { Play, Stop, Pause, Resume } type;
+    enum class Type : uint8_t { Play, Stop, Pause, Resume, ToggleSettings } type;
 };
 
 // Main service loop. Call service() from Arduino loop() — never from an ISR.
@@ -73,9 +73,20 @@ private:
                 tx_->resume();
                 midi_->sendContinue();
                 break;
+            case AppEvent::Type::ToggleSettings:
+                settingsToggle_ = true;
+                break;
             }
         }
         evtN_ = 0;
+    }
+
+public:
+    // Returns true (once) when a ToggleSettings event has been received.
+    bool consumeSettingsToggle() {
+        bool v = settingsToggle_;
+        settingsToggle_ = false;
+        return v;
     }
 
     void silenceAllTracks() {
@@ -100,4 +111,5 @@ private:
     uint8_t  evtN_{0};
 
     uint8_t clkDiv_{0};
+    bool    settingsToggle_{false};
 };
