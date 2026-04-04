@@ -70,11 +70,11 @@ Normal (no step held):
 - K4 = edit note length in steps (press = reset to 1)
 - K5 = step count ±1 (hold K5 + turn = ±16)
 
-Hold-step (step button held) — **shifted one left, K1 always active:**
-- K1 = live pitch edit
-- K2 = live velocity edit
-- K3 = live tick nudge (micro-offset)
-- K4 = live note duration in steps
+Hold-step (step button held):
+- K1 = tick nudge (micro-offset)
+- K2 = pitch
+- K3 = velocity
+- K4 = note duration in steps
 
 `CursorMode::editHeld(param, delta, pat)` — params: 0=pitch 1=vel 2=nudge 3=duration.
 

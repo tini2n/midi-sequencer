@@ -56,9 +56,9 @@ pitch    vel      nudge    duration
 
 | Encoder | Edits | Range |
 |---------|-------|-------|
-| K1 (0) | Pitch ±1 semitone | 0–127 |
-| K2 (1) | Velocity ±1 | 1–127 |
-| K3 (2) | Tick nudge — shifts note's exact start position ±1 tick | 0–∞ |
+| K1 (0) | Tick nudge — shifts note's exact start position ±1 tick | 0–∞ |
+| K2 (1) | Pitch ±1 semitone | 0–127 |
+| K3 (2) | Velocity ±1 | 1–127 |
 | K4 (3) | Note duration ±1 step | 1–128 steps |
 
 **Behavior:**

@@ -80,9 +80,9 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
     bool stepHeld = cursor_.getHeldStep() >= 0;
 
     switch (e.encoderId) {
-    case 0: // K1 — page offset (normal) | BPM (settings) | pitch (held)
+    case 0: // K1 — page offset (normal) | BPM (settings) | tick nudge (held)
         if (stepHeld) {
-            cursor_.editHeld(0, e.delta, pat_);
+            cursor_.editHeld(2, e.delta, pat_);
         } else if (settingsMode_) {
             float bpm = pat_.tempo + e.delta * 0.5f;
             if (bpm < 20.f)  bpm = 20.f;
@@ -95,9 +95,9 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
             cursor_.setPage((uint8_t)(pg < 0 ? 0 : pg), pat_.steps);
         }
         break;
-    case 1: // K2 — edit pitch (normal) | velocity (held)
+    case 1: // K2 — edit pitch (normal) | pitch (held)
         if (stepHeld) {
-            cursor_.editHeld(1, e.delta, pat_);
+            cursor_.editHeld(0, e.delta, pat_);
         } else {
             int p = (int)cursor_.getEditPitch() + e.delta;
             if (p < 0)   p = 0;
@@ -105,9 +105,9 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
             cursor_.setEditPitch((uint8_t)p);
         }
         break;
-    case 2: // K3 — edit velocity (normal) | tick nudge (held)
+    case 2: // K3 — edit velocity (normal) | velocity (held)
         if (stepHeld) {
-            cursor_.editHeld(2, e.delta, pat_);
+            cursor_.editHeld(1, e.delta, pat_);
         } else {
             int v = (int)cursor_.getEditVelocity() + e.delta;
             if (v < 1)   v = 1;
