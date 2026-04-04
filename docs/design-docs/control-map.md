@@ -24,55 +24,58 @@ Hardware surface: **Teensy 4.1** + PCF8575 matrix keyboard (16 step buttons + 8 
 
 ---
 
-## Encoders — First Layer (Sequencer Mode)
+## Encoders — Sequencer Mode (normal, no step held)
 
-Encoders group into three categories:
+Two interaction layers on the same knobs depending on whether a step button is held.
 
 ```
-Navigation  │ Feel        │ Structure
-K1  K2  K3  │ K4  K5  K6 │ K7  K8
+K1       K2       K3       K4       K5
+page     pitch    vel      length   steps
 ```
 
-| Encoder | Category | Turn | Press |
-|---------|----------|------|-------|
-| K1 (0) | Navigation | Page offset ±1 | Reset page to 0 |
-| K2 (1) | Navigation | Edit pitch ±1 semitone | Reset pitch to C4 (60) |
-| K3 (2) | Navigation | TODO | — |
-| K4 (3) | Navigation | TODO — zoom (Phase 5) | — |
-| K5 (4) | Structure | Step count ±1 (hold K5 + turn = ±16) | — |
-| K6 (5) | Structure | TODO | — |
-| K7 (6) | Feel | TODO | — |
-| K8 (7) | Feel | TODO | — |
+| Encoder | Turn | Press |
+|---------|------|-------|
+| K1 (0) | Page offset ±1 | Reset page to 0 |
+| K2 (1) | Edit pitch ±1 semitone (0–127) | Reset pitch to C4 (60) |
+| K3 (2) | Edit velocity ±1 (1–127) | Reset velocity to 100 |
+| K4 (3) | Edit note length ±1 step (1–128) | Reset length to 1 step |
+| K5 (4) | Step count ±1 (hold K5 + turn = ±16) | — |
+| K6–K8  | Reserved | — |
+
+---
+
+## Encoders — Hold-Step Mode (step button held)
+
+Hold any step button and turn an encoder to edit that note's properties live.
+Every encoder shifts **one position left** compared to normal mode — K1 is always active.
+
+```
+K1       K2       K3       K4
+pitch    vel      nudge    duration
+```
+
+| Encoder | Edits | Range |
+|---------|-------|-------|
+| K1 (0) | Pitch ±1 semitone | 0–127 |
+| K2 (1) | Velocity ±1 | 1–127 |
+| K3 (2) | Tick nudge — shifts note's exact start position ±1 tick | 0–∞ |
+| K4 (3) | Note duration ±1 step | 1–128 steps |
+
+**Behavior:**
+- Step press → note toggles on immediately; held state begins
+- While held + encoder turned → note updates live; track grid reprints after each delta
+- Release → held state clears; no second toggle
 
 ---
 
 ## Encoders — Settings Mode (CTL 6 active)
 
-Pressing CTL 6 enters Settings mode. Serial prints `[SET] on  BPM=xxx`.
+Press CTL 6 to enter Settings mode (`[SET] on`). Press again to exit (`[SET] off`).
 
 | Encoder | Action |
 |---------|--------|
 | K1 (0) | BPM ±0.5 per detent; press = reset to 120 |
-| K2–K8  | Reserved (future: MIDI channel, clock, etc.) |
-
-Press CTL 6 again to exit. Serial prints `[SET] off`.
-
----
-
-## Hold-Step Note Editing
-
-In Sequencer mode, **holding a step button while turning an encoder** edits that note's properties:
-
-| Encoder | Edits |
-|---------|-------|
-| K2 (1) | Pitch ±1 semitone (0–127) |
-| K3 (2) | Velocity ±1 (1–127) |
-| K4 (3) | Micro-offset: nudge note's tick position ±1 |
-
-**Behavior:**
-- Step press → note toggles on immediately (note is created/removed)
-- While held + encoder moved → note property updates live; track grid reprints after each delta
-- Release → held state cleared
+| K2–K8  | Reserved (MIDI channel, clock source, swing — TBD) |
 
 ---
 
@@ -80,10 +83,10 @@ In Sequencer mode, **holding a step button while turning an encoder** edits that
 
 | Button | Action |
 |--------|--------|
-| Shift + CTL 3 | Previous page |
-| Shift + CTL 0 | Clear selected step (CursorMode) |
-| Shift + CTL 1 | Copy selected step |
-| Shift + CTL 2 | Paste to selected step |
+| Shift + PG+ (CTL 3) | Previous page |
+| Shift + REC (CTL 0) | Clear selected step |
+| Shift + PLAY (CTL 1) | Copy selected step |
+| Shift + STOP (CTL 2) | Paste to selected step |
 
 ---
 
@@ -95,7 +98,7 @@ In Sequencer mode, buttons 0–15 map to step slots on the active track:
 actual_step = button + pageOffset × 16
 ```
 
-Press = toggle note on/off at that step using current edit pitch.
+Press = toggle note on/off using current edit pitch, velocity, and length.
 
 ---
 
@@ -103,9 +106,7 @@ Press = toggle note on/off at that step using current edit pitch.
 
 | Item | Notes |
 |------|-------|
-| K3 encoder function | TBD |
-| K4 encoder function | Zoom — deferred to Phase 5 (screen integration) |
-| K6–K8 encoder functions | TBD — candidates: grid resolution, velocity default, swing |
-| REC (CTL 0) | Real-time recording deferred to future phase |
+| K6–K8 encoder functions | Candidates: swing, grid resolution, MIDI channel |
+| REC (CTL 0) | Real-time recording — future phase |
 | MODE (CTL 4) | Only sequencer mode exists; additional modes TBD |
-| Settings: K2–K8 | Additional settings params TBD |
+| Settings: K2–K8 | MIDI channel, clock source, swing TBD |

@@ -3,16 +3,17 @@
 #include "config.hpp"
 
 // Pin assignments for 8 encoders (adjust to your hardware).
-// Encoder 0: page offset.  Encoder 1: edit pitch.  Others reserved.
+// Normal mode:  K1=page  K2=pitch  K3=velocity  K4=length  K5=step count
+// Held-step:    K1=pitch K2=vel    K3=nudge      K4=duration
 static const EncoderManager::PinConfig kEncoderPins[EncoderManager::NUM_ENCODERS] = {
-    {2,  3,  4},   // Enc 0 — page offset
-    {5,  6,  7},   // Enc 1 — edit pitch
-    {14, 15, 16},  // Enc 2 — reserved
-    {17, 18, 19},  // Enc 3 — reserved
-    {20, 21, 22},  // Enc 4 — reserved
-    {23, 24, 25},  // Enc 5 — reserved
-    {26, 27, 28},  // Enc 6 — reserved
-    {29, 30, 31},  // Enc 7 — reserved
+    {2,  3,  4},   // K1 — page offset / held: pitch
+    {5,  6,  7},   // K2 — edit pitch  / held: velocity
+    {14, 15, 16},  // K3 — edit vel    / held: tick nudge
+    {17, 18, 19},  // K4 — edit length / held: duration
+    {20, 21, 22},  // K5 — step count
+    {23, 24, 25},  // K6 — reserved
+    {26, 27, 28},  // K7 — reserved
+    {29, 30, 31},  // K8 — reserved
 };
 
 void App::setup() {
@@ -79,8 +80,10 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
     bool stepHeld = cursor_.getHeldStep() >= 0;
 
     switch (e.encoderId) {
-    case 0: // K1 — page offset; or BPM in settings mode
-        if (settingsMode_) {
+    case 0: // K1 — page offset (normal) | BPM (settings) | pitch (held)
+        if (stepHeld) {
+            cursor_.editHeld(0, e.delta, pat_);
+        } else if (settingsMode_) {
             float bpm = pat_.tempo + e.delta * 0.5f;
             if (bpm < 20.f)  bpm = 20.f;
             if (bpm > 300.f) bpm = 300.f;
@@ -92,9 +95,9 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
             cursor_.setPage((uint8_t)(pg < 0 ? 0 : pg), pat_.steps);
         }
         break;
-    case 1: { // K2 — edit pitch; or held-step pitch edit
+    case 1: // K2 — edit pitch (normal) | velocity (held)
         if (stepHeld) {
-            cursor_.editHeld(0, e.delta, pat_);
+            cursor_.editHeld(1, e.delta, pat_);
         } else {
             int p = (int)cursor_.getEditPitch() + e.delta;
             if (p < 0)   p = 0;
@@ -102,14 +105,27 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
             cursor_.setEditPitch((uint8_t)p);
         }
         break;
-    }
-    case 2: // K3 — held-step velocity edit (reserved otherwise)
-        if (stepHeld) cursor_.editHeld(1, e.delta, pat_);
+    case 2: // K3 — edit velocity (normal) | tick nudge (held)
+        if (stepHeld) {
+            cursor_.editHeld(2, e.delta, pat_);
+        } else {
+            int v = (int)cursor_.getEditVelocity() + e.delta;
+            if (v < 1)   v = 1;
+            if (v > 127) v = 127;
+            cursor_.setEditVelocity((uint8_t)v);
+        }
         break;
-    case 3: // K4 — held-step micro-offset (reserved; zoom in Phase 5)
-        if (stepHeld) cursor_.editHeld(2, e.delta, pat_);
+    case 3: // K4 — edit note length in steps (normal) | duration (held)
+        if (stepHeld) {
+            cursor_.editHeld(3, e.delta, pat_);
+        } else {
+            int l = (int)cursor_.getEditLength() + e.delta;
+            if (l < 1)   l = 1;
+            if (l > 128) l = 128;
+            cursor_.setEditLength((uint8_t)l);
+        }
         break;
-    case 4: { // K5 — step count (±1, or ±16 if button held)
+    case 4: { // K5 — step count (±1, or ±16 if K5 button held)
         int delta = k5Held_ ? e.delta * 16 : e.delta;
         int steps = (int)pat_.steps + delta;
         if (steps < 1)   steps = 1;
@@ -132,7 +148,13 @@ void App::onEncoderButton(const EncoderButtonEvent& e) {
         else               { cursor_.setPage(0, pat_.steps); }
         break;
     case 1:
-        if (e.pressed) cursor_.setEditPitch(60);  // reset pitch to C4
+        if (e.pressed) cursor_.setEditPitch(60);      // reset to C4
+        break;
+    case 2:
+        if (e.pressed) cursor_.setEditVelocity(100);  // reset to 100
+        break;
+    case 3:
+        if (e.pressed) cursor_.setEditLength(1);      // reset to 1 step
         break;
     case 4:
         k5Held_ = e.pressed;  // track hold state for ±16 step mode

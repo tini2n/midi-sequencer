@@ -35,17 +35,21 @@ public:
     void getConfig(IModeConfig& cfg) const override  { cfg.editPitch = editPitch_; }
 
     void setEditPitch(uint8_t pitch);
+    void setEditVelocity(uint8_t vel);
+    void setEditLength(uint8_t steps);   // note length in steps (1 = one step, 2 = two, …)
     void setPage(uint8_t page, uint8_t patternSteps = 255);
     void setTrack(uint8_t t) { trackIdx_ = (t < MAX_TRACKS) ? t : 0; }
 
-    uint8_t getEditPitch()   const { return editPitch_; }
-    uint8_t getPage()        const { return pageOffset_; }
-    uint8_t getTrack()       const { return trackIdx_; }
-    bool    isShiftPressed() const { return shiftPressed_; }
-    int8_t  getHeldStep()    const { return heldStep_; }
+    uint8_t getEditPitch()    const { return editPitch_; }
+    uint8_t getEditVelocity() const { return editVelocity_; }
+    uint8_t getEditLength()   const { return editLength_; }
+    uint8_t getPage()         const { return pageOffset_; }
+    uint8_t getTrack()        const { return trackIdx_; }
+    bool    isShiftPressed()  const { return shiftPressed_; }
+    int8_t  getHeldStep()     const { return heldStep_; }
 
     // Edit a property of the currently held step's note.
-    // param: 0=pitch, 1=velocity, 2=micro-offset (tick nudge).
+    // param: 0=pitch  1=velocity  2=tick nudge  3=duration (steps)
     // Safe to call even when no step is held (no-op).
     void editHeld(uint8_t param, int8_t delta, Pattern& pat);
 
@@ -59,9 +63,11 @@ public:
     void clearStep(Pattern& pat);
 
 private:
-    uint8_t pageOffset_{0};  // which page of 16 steps is on the buttons
-    uint8_t editPitch_{60};  // C4 — MIDI note for new trigs
-    uint8_t trackIdx_{0};    // which track is being edited (0 or 1)
+    uint8_t pageOffset_{0};    // which page of 16 steps is on the buttons
+    uint8_t editPitch_{60};    // C4   — MIDI note for new trigs
+    uint8_t editVelocity_{100}; // 100 — velocity for new trigs
+    uint8_t editLength_{1};    // 1   — note length in steps for new trigs
+    uint8_t trackIdx_{0};      // which track is being edited (0 or 1)
     uint8_t selectedStep_{0};
     bool    shiftPressed_{false};
 

@@ -56,18 +56,29 @@ Key timing: PPQN=96, one 1/16 step = 24 ticks, one 4/4 bar = 384 ticks. Always u
 
 `CursorMode` implements Digitakt-style step editing:
 - 16 keyboard buttons map to 16 step slots. Press = toggle note on/off at that step.
-- `pageOffset_` (K1/Enc 0): actual step = btn + pageOffset × 16. Lets you edit beyond 16 steps.
-- `editPitch_` (K2/Enc 1): MIDI note assigned to new trigs.
 - `trackIdx_` (CTL 5): toggle active track 0↔1.
 - After every note change, `printTrackState()` prints an ASCII step grid to Serial.
 
 **CTL buttons:** `[REC][PLAY][STOP][PG+][MODE][TRK][SET][SHF]` (indices 0–7)
 
-**Hold-step editing:** Hold a step button and turn K2/K3/K4 to edit pitch/velocity/micro-offset of that note live. `CursorMode::editHeld(param, delta, pat)` — called from `App::onEncoderRotation()` when `cursor_.getHeldStep() >= 0`.
+**Encoder layout — two layers on the same knobs:**
+
+Normal (no step held):
+- K1 = page offset (press = reset to 0)
+- K2 = edit pitch for new trigs (press = reset to C4)
+- K3 = edit velocity for new trigs (press = reset to 100)
+- K4 = edit note length in steps (press = reset to 1)
+- K5 = step count ±1 (hold K5 + turn = ±16)
+
+Hold-step (step button held) — **shifted one left, K1 always active:**
+- K1 = live pitch edit
+- K2 = live velocity edit
+- K3 = live tick nudge (micro-offset)
+- K4 = live note duration in steps
+
+`CursorMode::editHeld(param, delta, pat)` — params: 0=pitch 1=vel 2=nudge 3=duration.
 
 **Settings mode (CTL 6):** K1 controls BPM (±0.5 per detent; press = reset to 120). Toggle via `RunLoop::consumeSettingsToggle()` checked in `App::update()`.
-
-**K5 (Enc 4):** step count ±1 per detent; hold K5 button while turning = ±16 steps.
 
 Full control map: `docs/design-docs/control-map.md`.
 
@@ -76,7 +87,7 @@ Full control map: `docs/design-docs/control-map.md`.
 ### Note Layers
 
 Each `LayeredTrack` has two independent `NotePool` layers:
-- **recorded**: notes the user played in (max 256)
+- **recorded**: notes the user played in (max 128 — 8 pages × 16 steps)
 - **generative**: algorithmically generated notes (max 128)
 
 Generators write to a staging buffer and swap atomically — they never overwrite recorded notes. Both layers are scanned together during playback.

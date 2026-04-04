@@ -60,6 +60,19 @@ void CursorMode::setEditPitch(uint8_t pitch) {
     Serial.printf("[Cursor] pitch -> %s (%u)\n", pitchName(pitch, buf, sizeof(buf)), pitch);
 }
 
+void CursorMode::setEditVelocity(uint8_t vel) {
+    if (vel < 1)   vel = 1;
+    if (vel > 127) vel = 127;
+    editVelocity_ = vel;
+    Serial.printf("[Cursor] vel -> %u\n", vel);
+}
+
+void CursorMode::setEditLength(uint8_t steps) {
+    if (steps < 1) steps = 1;
+    editLength_ = steps;
+    Serial.printf("[Cursor] len -> %u step(s)\n", steps);
+}
+
 void CursorMode::setPage(uint8_t page, uint8_t patternSteps) {
     uint8_t maxPage = (patternSteps > 16) ? ((patternSteps - 1) / 16) : 0;
     if (page > maxPage) page = maxPage;
@@ -88,9 +101,9 @@ void CursorMode::toggleStep(uint8_t step, Pattern& pat) {
     } else {
         Note n{};
         n.on       = stepToTick(step, pat);
-        n.duration = pat.ticks() / pat.steps; // one step long
+        n.duration = (uint32_t)editLength_ * (pat.ticks() / pat.steps);
         n.pitch    = editPitch_;
-        n.vel      = 100;
+        n.vel      = editVelocity_;
         n.micro_q8 = 0;
         n.flags    = 0;
         if (!pool.push(n)) {
@@ -165,10 +178,10 @@ void CursorMode::printTrackState(const Pattern& pat) const {
     const uint8_t  end   = start + 16; // exclusive
 
     char pitchBuf[5];
-    Serial.printf("Trk%u ch%u  page%u  pitch:%s  notes:%u\n",
+    Serial.printf("Trk%u ch%u  page%u  pitch:%s  vel:%u  len:%u  notes:%u\n",
                   trackIdx_, ch, pageOffset_,
                   pitchName(editPitch_, pitchBuf, sizeof(pitchBuf)),
-                  pool.count);
+                  editVelocity_, editLength_, pool.count);
 
     // Row 1: step active markers
     for (uint8_t s = start; s < end; ++s) {
@@ -239,11 +252,22 @@ void CursorMode::editHeld(uint8_t param, int8_t delta, Pattern& pat) {
         Serial.printf("[Hold] step%d vel -> %u\n", heldStep_, n->vel);
         break;
     }
-    case 2: { // micro-offset (tick nudge)
+    case 2: { // tick nudge (micro-offset)
         int32_t t = (int32_t)n->on + delta;
         n->on = (uint32_t)(t < 0 ? 0 : t);
         pool.sortByOnTick();
         Serial.printf("[Hold] step%d tick -> %lu\n", heldStep_, (unsigned long)n->on);
+        break;
+    }
+    case 3: { // note duration in steps
+        uint32_t tps = pat.ticks() / pat.steps;
+        if (tps == 0) break;
+        int32_t cur = (int32_t)(n->duration / tps);
+        int32_t next = cur + delta;
+        if (next < 1)   next = 1;
+        if (next > 128) next = 128;
+        n->duration = (uint32_t)next * tps;
+        Serial.printf("[Hold] step%d dur -> %d step(s)\n", heldStep_, (int)next);
         break;
     }
     default:
