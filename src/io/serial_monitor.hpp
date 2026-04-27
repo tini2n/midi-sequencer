@@ -118,7 +118,7 @@ private:
                         cursor_->setTrack(tr);
                         cursor_->setEditPitch(pitch);
                         // Force add (not toggle — if already exists, skip)
-                        NotePool<256>& pool = pat_->tracks[tr].recorded;
+                        NotePool<128>& pool = pat_->tracks[tr].recorded;
                         uint32_t tick = uint32_t(step) * (pat_->ticks() / pat_->steps);
                         bool exists = false;
                         for (uint16_t i = 0; i < pool.count; ++i)
@@ -141,7 +141,7 @@ private:
             uint8_t tr, step;
             if (parseCSV2(s + 1, tr, step)) {
                 if (tr < MAX_TRACKS && step < pat_->steps) {
-                    NotePool<256>& pool = pat_->tracks[tr].recorded;
+                    NotePool<128>& pool = pat_->tracks[tr].recorded;
                     uint32_t tick = uint32_t(step) * (pat_->ticks() / pat_->steps);
                     for (uint16_t i = 0; i < pool.count; ) {
                         if (pool.notes[i].on == tick) pool.removeAt(i);
