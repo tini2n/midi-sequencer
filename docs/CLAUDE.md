@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Efficency Core
+
+- **Brevity-First:** Prioritize high information density. Eliminate filler phrases, conversational "fluff," and social pleasantries (e.g., "Certainly," "I hope this helps").
+- **Zero Redundancy:** Do not restate the user’s prompt or explain what you are about to do. Start the response immediately at the first point of value.
+- **Structural Efficiency:** Use Markdown (bullets, tables, headers) to convey relationships between ideas. Avoid long-form prose unless narrative flow is essential to the task.
+- **Implicit Context:** Assume a high level of competence. Do not explain basic concepts unless explicitly requested or necessary for the solution.
+- **Omit Meta-Talk:** No self-references ("As an AI," "Based on my training"). 
+- **Direct Resolution:** Address the core intent of the query with the fewest tokens possible while maintaining technical/creative integrity.
+
 ## What This Is
 
 A polyphonic MIDI step sequencer firmware for Teensy 4.1 (C++17, PlatformIO). Digitakt-style: 16 keyboard buttons = 16 step slots, toggle notes on/off per track. 2 active tracks, each on its own MIDI output channel. Plays back via MIDI out with no heap allocation in the hot path. The project is mid-refactor — see [PLANS.md](docs/PLANS.md) and the exec plans in `docs/exec-plans/active/` before starting any work.

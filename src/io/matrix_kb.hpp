@@ -27,13 +27,13 @@ public:
 
     bool begin(const Config& c, uint8_t root = 0, int8_t octave = 4, uint8_t vel = 100) {
         cfg_ = c;
-        pcf_.begin(cfg_.address);
+        bool ok = pcf_.begin(cfg_.address);
+        if (!ok) Serial.println("[MatrixKB] PCF8575 init failed — keyboard disabled");
         setRoot(root);
         setOctave(octave);
         vel_ = vel;
         reset();
-        pcf_.write(0xFFFF);
-        return true;
+        return ok;
     }
 
     void setRoot(uint8_t r)   { root_ = r % 12; computeBottomOffsets(); }
@@ -68,6 +68,7 @@ private:
     uint32_t debCtlUntil_[8]{};
     bool     pressed_[16]{};
     int16_t  pitch_[16]{};
+    uint16_t lastRaw_{0xFFFF}; // for raw diagnostic in poll()
 
     uint8_t root_{0}, oct_{4}, vel_{100};
     Scale   scale_{Scale::None};
