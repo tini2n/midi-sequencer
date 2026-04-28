@@ -7,6 +7,16 @@ Severity: HIGH = crash/data-loss risk; MED = performance; LOW = code smell
 
 ## HIGH
 
+- **[HIGH]** `app.cpp:12` — Encoder K4 pin conflict with I2C bus.
+  `kEncoderPins[3]` is set to `{17, 18, 19}`. Pins 18 (SDA0) and 19 (SCL0) are the Teensy 4.1
+  Wire/I2C0 bus lines shared with the PCF8575 keyboard driver. `enc_.begin()` reconfigures
+  those pins as GPIO interrupt inputs, breaking all subsequent Wire transactions.
+  Symptom: `pcf_.read()` silently returns false on every poll cycle → keyboard buttons never
+  detected even though PCF initialises successfully.
+  Fix: check physical wiring of encoder K4, then update `kEncoderPins[3]` to pins that avoid
+  I2C0 (18, 19) and I2C1 (16, 17). Safe alternatives: any of pins 0–15, 20–23, 26–41.
+  **TODO: confirm physical K4 encoder pin wiring before applying fix.**
+
 - **[HIGH]** `engine/generator.hpp:73` — `std::map<const char*, GeneratorParameter>` uses pointer
   comparison for keys. `find("density")` may silently fail if string literals differ by TU.
   Fix: replace with fixed `GeneratorParam params[N]` array indexed by enum.

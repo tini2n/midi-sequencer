@@ -4,43 +4,11 @@
 void MatrixKB::poll(MidiIO& midi, uint8_t ch) {
     uint32_t now = micros();
 
-    // ── Scan diagnostic (remove when buttons confirmed working) ──────────────
-    // Every 500 ms: drive ALL row pins low simultaneously, print raw read.
-    // Press a button and watch — any low column bit here means matrix works.
-    // If cols stay 0xFF regardless: buttons are not connecting rows to columns.
-    static uint32_t diagNext = 0;
-    if ((int32_t)(now - diagNext) >= 0) {
-        diagNext = now + 1000000; // every 1s
-
-        // Test 1: drive ALL 16 pins low — if read still 0xFFFF, external pull-ups override PCF
-        pcf_.write(0x0000);
-        uint16_t all_low = 0xFFFF; pcf_.read(all_low);
-
-        // Test 2: all pins as input — baseline, expect 0xFFFF
-        pcf_.write(0xFFFF);
-        uint16_t all_high = 0x0000; pcf_.read(all_high);
-
-        Serial.printf("[KB diag] write=0x0000 read=0x%04X | write=0xFFFF read=0x%04X\n",
-                      all_low, all_high);
-
-        if (all_low == 0xFFFF)
-            Serial.println("[KB diag] WARNING: PCF cannot drive pins low — check hardware");
-        else
-            Serial.printf("[KB diag] PCF output OK — pins that went low: 0x%04X\n",
-                         (~all_low) & 0xFFFF);
-    }
-    // ─────────────────────────────────────────────────────────────────────────
-
     for (uint8_t r = 0; r < 3; r++) {
         if (!driveRow(r)) continue;
 
         uint16_t pins = 0xFFFF;
         if (!pcf_.read(pins)) continue;
-
-#ifdef SEQUENCER_DEBUG
-        if (pins != 0xFFFF)
-            Serial.printf("[KB] row%u raw=0x%04X\n", r, pins);
-#endif
 
         for (uint8_t c = 0; c < 8; c++) {
             bool down = ((pins >> cfg_.cols[c]) & 1) == 0;

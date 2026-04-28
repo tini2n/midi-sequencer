@@ -9,7 +9,7 @@ static const EncoderManager::PinConfig kEncoderPins[EncoderManager::NUM_ENCODERS
     {2,  3,  4},   // K1 — page offset / held: pitch
     {5,  6,  7},   // K2 — edit pitch  / held: velocity
     {14, 15, 16},  // K3 — edit vel    / held: tick nudge
-    {17, 18, 19},  // K4 — edit length / held: duration
+    {32, 33, 34},  // K4 — edit length / held: duration  (stub: pins 17/18/19 conflict with Wire SDA/SCL — update when physical wiring confirmed)
     {20, 21, 22},  // K5 — step count
     {23, 24, 25},  // K6 — reserved
     {26, 27, 28},  // K7 — reserved
