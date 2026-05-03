@@ -6,14 +6,15 @@
 // Normal mode:  K1=page  K2=pitch  K3=velocity  K4=length  K5=step count
 // Held-step:    K1=pitch K2=vel    K3=nudge      K4=duration
 static const EncoderManager::PinConfig kEncoderPins[EncoderManager::NUM_ENCODERS] = {
-    {2,  3,  4},   // K1 — page offset / held: pitch
-    {5,  6,  7},   // K2 — edit pitch  / held: velocity
-    {14, 15, 16},  // K3 — edit vel    / held: tick nudge
-    {32, 33, 34},  // K4 — edit length / held: duration  (stub: pins 17/18/19 conflict with Wire SDA/SCL — update when physical wiring confirmed)
-    {20, 21, 22},  // K5 — step count
-    {23, 24, 25},  // K6 — reserved
-    {26, 27, 28},  // K7 — reserved
-    {29, 30, 31},  // K8 — reserved
+    // {pinA, pinB, pinSW} — matches physical hardware
+    {2,  3,  0},   // K1 (ENC1) — page offset     | held: tick nudge
+    {4,  5,  12},  // K2 (ENC2) — edit pitch       | held: pitch
+    {6,  7,  26},  // K3 (ENC3) — edit velocity    | held: velocity
+    {14, 15, 27},  // K4 (ENC4) — edit note length | held: duration
+    {16, 17, 28},  // K5 (ENC5) — step count
+    {20, 21, 29},  // K6 (ENC6) — reserved
+    {22, 23, 30},  // K7 (ENC7) — reserved
+    {24, 25, 31},  // K8 (ENC8) — reserved
 };
 
 void App::setup() {
@@ -77,6 +78,9 @@ void App::update() {
 // ─── Encoder routing ──────────────────────────────────────────────────────────
 
 void App::onEncoderRotation(const EncoderRotationEvent& e) {
+#ifdef SEQUENCER_DEBUG
+    Serial.printf("[ENC] K%u %+d\n", e.encoderId + 1, e.delta);
+#endif
     bool stepHeld = cursor_.getHeldStep() >= 0;
 
     switch (e.encoderId) {
@@ -132,7 +136,7 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
         if (steps > 255) steps = 255;
         pat_.steps = (uint8_t)steps;
         tx_.setLoopLen(pat_.ticks());
-        Serial.printf("[K5] steps=%u  ticks=%lu\n", pat_.steps, (unsigned long)pat_.ticks());
+        Serial.printf("Steps=%d  ticks=%lu\n", steps, (unsigned long)pat_.ticks());\
         break;
     }
     default:
@@ -141,6 +145,9 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
 }
 
 void App::onEncoderButton(const EncoderButtonEvent& e) {
+#ifdef SEQUENCER_DEBUG
+    Serial.printf("[ENC] K%u %s\n", e.encoderId + 1, e.pressed ? "press" : "release");
+#endif
     switch (e.encoderId) {
     case 0:
         if (!e.pressed) break;

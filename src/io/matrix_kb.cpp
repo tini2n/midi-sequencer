@@ -60,7 +60,7 @@ int MatrixKB::rowToBtn(uint8_t r, uint8_t c) const {
 
 void MatrixKB::onControl(uint8_t c, bool down) {
 #ifdef SEQUENCER_DEBUG
-    Serial.printf("CTL %u %s\n", c, down ? "DOWN" : "UP");
+    Serial.printf("[CTL] %u %s\n", c, down ? "down" : "up");
 #endif
     // Let mode handle it first (shift key, copy/paste, etc.)
     bool shift = false;
@@ -122,7 +122,7 @@ void MatrixKB::noteOn(int btn, MidiIO& midi, uint8_t ch) {
     pitch_[btn]   = p;
     midi.send({ch, (uint8_t)p, vel_, true, 0});
 #ifdef SEQUENCER_DEBUG
-    Serial.printf("NoteON  %d btn%d ch%u v%u\n", p, btn, ch, vel_);
+    Serial.printf("[MIDI] ON  p%d btn%u ch%u v%u\n", p, (uint8_t)btn, ch, vel_);
 #endif
 }
 
@@ -134,7 +134,7 @@ void MatrixKB::noteOff(int btn, MidiIO& midi, uint8_t ch) {
     if (p >= 0 && p <= 127) {
         midi.send({ch, (uint8_t)p, 0, false, 0});
 #ifdef SEQUENCER_DEBUG
-        Serial.printf("NoteOFF %d btn%d ch%u\n", p, btn, ch);
+        Serial.printf("[MIDI] OFF p%d btn%u ch%u\n", p, (uint8_t)btn, ch);
 #endif
     }
 }
