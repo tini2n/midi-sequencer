@@ -50,7 +50,9 @@ void App::setup() {
     cursor_.setPage(0, pat_.steps);
     cursor_.setEditPitch(60);
 
-    // Matrix keyboard
+    // Matrix keyboard — PCF8575 needs time to stabilise on shared 3.3V rail.
+    // Diagnostic showed it takes ~450ms from boot; pad to 600ms total here.
+    while (millis() < 600) {}
     MatrixKB::Config kbCfg;
     kbCfg.address = cfg::PCF_ADDRESS;
     kb_.begin(kbCfg);
@@ -65,6 +67,10 @@ void App::setup() {
     // Serial monitor
     serial_.attach(&loop_, &tx_, &pat_, &midi_, &cursor_);
 
+    // OLED display
+    oled_.begin();
+    screenMgr_.begin(&oled_);
+
     Serial.println("=== MIDI Sequencer ready ===");
     Serial.println("Type ? for serial commands.");
     cursor_.onActivate();
@@ -73,15 +79,21 @@ void App::setup() {
 void App::update() {
     serial_.poll();
     kb_.poll(midi_, pat_.tracks[cursor_.getTrack()].channel);
+    screenMgr_.markDirty();  // keyboard may have toggled a note
     enc_.poll();
     loop_.service();
 
     // Handle settings mode toggle (posted from CTL 6 via RunLoop event)
     if (loop_.consumeSettingsToggle()) {
         settingsMode_ = !settingsMode_;
+        screenMgr_.setScreen(settingsMode_ ? ScreenId::Settings : ScreenId::PianoRoll);
         if (settingsMode_) Serial.printf("[SET] on   BPM=%.1f\n", pat_.tempo);
         else               Serial.println("[SET] off");
     }
+
+    // Draw display (rate-capped internally; dirty flag set by encoder/key handlers)
+    UICtx ctx{pat_, tx_, cursor_, micros(), settingsMode_};
+    screenMgr_.draw(ctx);
 }
 
 // ─── Encoder routing ──────────────────────────────────────────────────────────
@@ -145,12 +157,13 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
         if (steps > 255) steps = 255;
         pat_.steps = (uint8_t)steps;
         tx_.setLoopLen(pat_.ticks());
-        Serial.printf("Steps=%d  ticks=%lu\n", steps, (unsigned long)pat_.ticks());\
+        Serial.printf("Steps=%d  ticks=%lu\n", steps, (unsigned long)pat_.ticks());
         break;
     }
     default:
         break;
     }
+    screenMgr_.markDirty();
 }
 
 void App::onEncoderButton(const EncoderButtonEvent& e) {
@@ -178,4 +191,5 @@ void App::onEncoderButton(const EncoderButtonEvent& e) {
     default:
         break;
     }
+    screenMgr_.markDirty();
 }

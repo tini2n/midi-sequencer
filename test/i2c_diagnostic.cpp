@@ -196,8 +196,35 @@ static void testTiming() {
         Serial.println(F("  SLOW — high bus capacitance or pull-ups too weak"));
 }
 
+// ── RECOVERY: 9-clock flush ───────────────────────────────────────────────────
+// Slave mid-transaction holds SDA low when master resets. Clock 9 SCL pulses to
+// flush any in-progress byte, then send a STOP condition to release the bus.
+// Call this BEFORE Wire.begin().
+static void recoverBus() {
+    hr("RECOVERY — clocking 9 SCL pulses to release stuck slave");
+    pinMode(SDA_PIN, INPUT_PULLUP);
+    pinMode(SCL_PIN, OUTPUT);
+    delayMicroseconds(10);
+    bool released = false;
+    for (int i = 0; i < 9; i++) {
+        digitalWrite(SCL_PIN, LOW);  delayMicroseconds(5);
+        digitalWrite(SCL_PIN, HIGH); delayMicroseconds(5);
+        if (digitalRead(SDA_PIN)) { released = true; break; }
+    }
+    // STOP condition
+    pinMode(SDA_PIN, OUTPUT);
+    digitalWrite(SDA_PIN, LOW);  delayMicroseconds(5);
+    digitalWrite(SCL_PIN, HIGH); delayMicroseconds(5);
+    digitalWrite(SDA_PIN, HIGH); delayMicroseconds(5);
+    pinMode(SDA_PIN, INPUT_PULLUP);
+    pinMode(SCL_PIN, INPUT_PULLUP);
+    delayMicroseconds(100);
+    Serial.printf("  SDA after recovery: %s\n", digitalRead(SDA_PIN) ? "HIGH ✓" : "LOW  ✗");
+    Serial.println(released ? "  Slave released SDA during clocking — bus should be free."
+                            : "  SDA still LOW after 9 pulses — check for short to GND.");
+}
+
 // ── TEST 6: bus lock-up check ─────────────────────────────────────────────────
-// If SDA is stuck LOW after Wire.begin, clock out 9 pulses to free it.
 static void testBusLockup() {
     hr("TEST 6 — bus lock-up check (SDA state after init)");
 
@@ -240,6 +267,9 @@ void setup() {
     // Test 1 must run BEFORE Wire.begin
     testBusIdle();
 
+    // Always run recovery first — harmless if bus is fine, essential if SDA is stuck
+    recoverBus();
+
     Wire.begin();
     Wire.setClock(400000);
     delay(10);
@@ -257,15 +287,17 @@ void setup() {
     testBusLockup();
 
     hr("DONE — interactive commands");
-    Serial.println(F("  1 = bus scan        2 = drive test"));
-    Serial.println(F("  3 = pin walk        4 = timing"));
-    Serial.println(F("  5 = lock-up check   r = run all tests"));
+    Serial.println(F("  0 = bus recovery    1 = bus scan        2 = drive test"));
+    Serial.println(F("  3 = pin walk        4 = timing          5 = lock-up check"));
+    Serial.println(F("  r = run all tests"));
 }
 
 void loop() {
     if (!Serial.available()) return;
     char c = (char)Serial.read();
     switch (c) {
+        case '0': recoverBus(); Wire.begin(); Wire.setClock(400000);
+                  s_pcfPresent = testBusScan(); break;
         case '1': testBusScan();    break;
         case '2': if (s_pcfPresent) testPcfDrive();  else Serial.println(F("PCF not found")); break;
         case '3': if (s_pcfPresent) testPinWalk();   else Serial.println(F("PCF not found")); break;

@@ -9,6 +9,9 @@
 #include "io/matrix_kb.hpp"
 #include "io/encoder_manager.hpp"
 #include "io/serial_monitor.hpp"
+#include "ui/oled_renderer.hpp"
+#include "ui/screen_manager.hpp"
+#include "ui/ui_ctx.hpp"
 
 class App : public IEncoderHandler {
 public:
@@ -31,6 +34,9 @@ private:
     MatrixKB       kb_;
     EncoderManager enc_;
     SerialMonitor  serial_;
+
+    OledRenderer   oled_;
+    ScreenManager  screenMgr_;
 
     bool    settingsMode_{false}; // true while CTL 6 (SETTINGS) is active
     bool    k5Held_{false};       // encoder 4 button held → ±16 step mode
