@@ -17,11 +17,14 @@ class EncoderManager {
 public:
     static constexpr uint8_t NUM_ENCODERS = 8;
 
-    struct PinConfig { uint8_t pinA, pinB, pinSW; };
+    // reversed=true inverts the delta in software — use when A and B are
+    // physically swapped on the PCB so that L always yields −1 and R yields +1.
+    struct PinConfig { uint8_t pinA, pinB, pinSW; bool reversed{false}; };
 
     void begin(const PinConfig configs[NUM_ENCODERS], uint32_t debounceUs = 5000) {
         for (uint8_t i = 0; i < NUM_ENCODERS; i++)
-            encoders_[i].begin(configs[i].pinA, configs[i].pinB, configs[i].pinSW, debounceUs);
+            encoders_[i].begin(configs[i].pinA, configs[i].pinB, configs[i].pinSW,
+                               debounceUs, configs[i].reversed);
     }
 
     void setHandler(IEncoderHandler* h) { handler_ = h; }

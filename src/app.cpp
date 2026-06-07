@@ -2,19 +2,28 @@
 #include "types.hpp"
 #include "config.hpp"
 
-// Pin assignments for 8 encoders (adjust to your hardware).
+// Pin assignments for 8 encoders.
+// {pinA, pinB, pinSW, reversed}
+//
+// reversed=true: A and B are physically swapped on the PCB; the delta is
+// negated in software so L always gives −1, R always gives +1.
+//
+// Known hardware issues (do not reorder wires — fix here in software):
+//   K4 SW (pin 27): switch not triggering — pinSW likely miswired or floating.
+//   K7 left rotation cross-triggers K8 SW events — pinA or pinB of K7 is
+//     shared with pinSW of K8 on the PCB; cannot be fixed in software.
+//
 // Normal mode:  K1=page  K2=pitch  K3=velocity  K4=length  K5=step count
-// Held-step:    K1=pitch K2=vel    K3=nudge      K4=duration
+// Held-step:    K1=nudge K2=pitch  K3=vel        K4=duration
 static const EncoderManager::PinConfig kEncoderPins[EncoderManager::NUM_ENCODERS] = {
-    // {pinA, pinB, pinSW} — matches physical hardware
-    {2,  3,  0},   // K1 (ENC1) — page offset     | held: tick nudge
-    {4,  5,  12},  // K2 (ENC2) — edit pitch       | held: pitch
-    {6,  7,  26},  // K3 (ENC3) — edit velocity    | held: velocity
-    {14, 15, 27},  // K4 (ENC4) — edit note length | held: duration
-    {16, 17, 28},  // K5 (ENC5) — step count
-    {20, 21, 29},  // K6 (ENC6) — reserved
-    {22, 23, 30},  // K7 (ENC7) — reserved
-    {24, 25, 31},  // K8 (ENC8) — reserved
+    {2,  3,  0,  false},  // K1 — page offset     | held: tick nudge
+    {4,  5,  12, false},  // K2 — edit pitch       | held: pitch
+    {6,  7,  26, true },  // K3 — edit velocity    | held: velocity  (A/B swapped)
+    {14, 15, 27, true },  // K4 — edit note length | held: duration  (A/B swapped; SW broken)
+    {16, 17, 28, false},  // K5 — step count
+    {20, 21, 29, true },  // K6 — reserved                           (A/B swapped)
+    {22, 23, 30, true },  // K7 — reserved         (A/B swapped; left rotation triggers K8 SW)
+    {24, 25, 31, true },  // K8 — reserved                           (A/B swapped)
 };
 
 void App::setup() {
