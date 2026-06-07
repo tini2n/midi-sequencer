@@ -4,58 +4,89 @@ Hardware: Teensy 4.1, SSD1322 NHD 256×64 OLED (SPI), PCF8575 I2C 16-bit I/O exp
 
 ---
 
-## Confirmed Root Cause — Power-on Timing Race
+## Current Diagnosis
 
-**Diagnostic result (2026-06-07):**
+**Confirmed:**
+- No SPI↔I2C wiring shorts.
+- No wrong OLED interface mode (no extra I2C devices).
+- All pins read HIGH before init — I2C pull-ups are present.
 
-- Step 1: all pins HIGH — no wiring shorts.
-- Step 1b: no SPI↔I2C shorts.
-- Step 5 (I2C scan after OLED init): PCF not found.
-- Continuous ping test `c` (run several seconds after boot): **100 / 100 OK**.
+**Confirmed failure mode:**
+- OLED connected + powered → PCF8575 completely absent from I2C bus. Not found even after 10 seconds of continuous polling.
+- OLED disconnected → PCF works normally.
 
-**Conclusion:** the PCF8575 is electrically healthy and stable. It simply needs more time after power-on before it starts responding to I2C. The firmware's I2C scan was running before the chip had finished booting.
+**Root cause: 3.3V rail voltage collapse.**
 
-The OLED module does not interfere with I2C in any way — no wrong interface mode, no voltage droop, no signal coupling.
+The OLED module (SSD1322 + panel + boost converter) draws significant current from the 3.3V rail when powered. The Teensy 4.1's onboard 3.3V regulator cannot supply enough current for both devices simultaneously without the rail drooping. The PCF8575 minimum operating voltage is 2.5V; below this it stops responding entirely and disappears from the bus. The Teensy itself survives because it's decoupled closer to the regulator, but the PCF (further down the power rail, with no local bulk capacitance) sees a lower voltage.
 
----
-
-## Fix (Already Applied)
-
-In `src/app.cpp`, before `kb_.begin()`:
-
-```cpp
-// PCF8575 needs ~450ms to stabilise on power-on.
-// The OLED init already occupies most of this, but pad to 600ms to be safe.
-while (millis() < 600) {}
-MatrixKB::Config kbCfg;
-kbCfg.address = cfg::PCF_ADDRESS;
-kb_.begin(kbCfg);
-```
-
-This is all that is needed. The PCF8575 is fully stable once it has had enough time to boot.
+The `digitalRead(SDA)=HIGH` in the pin census is not proof the rail is healthy — the Teensy's input threshold is lower than PCF8575's minimum VCC, so the pin reads HIGH even when the rail is too low for the PCF to operate.
 
 ---
 
-## Why the OLED Appeared to Cause the Problem
+## Fix Priority Order
 
-The OLED module was being powered from the same 3.3 V rail. When the OLED was disconnected, its SPI init sequence was skipped, and the Teensy reached the I2C scan slightly later — enough extra milliseconds for the PCF to be ready. When the OLED was connected, `u8g2.begin()` runs first and (ironically) its reset pulse sequence takes ~100–200 ms, which usually isn't enough. The symptom looked like OLED interference but was purely a timing coincidence.
+### Fix 1 — Power OLED from 5V (recommended, permanent)
+
+Most NHD SSD1322 modules have an onboard linear regulator and accept 5V on their VCC/VIN pin. The logic signal pins (CS, DC, RST, MOSI, SCK) stay at 3.3V Teensy levels.
+
+- Connect OLED VCC/VIN to Teensy `Vin` pin (5V from USB).
+- Keep all signal wires on 3.3V Teensy pins as-is.
+- PCF8575 VCC stays on 3.3V.
+
+This removes the OLED from the 3.3V rail entirely. The Teensy 4.1's `Vin` pin is directly from USB (or external supply) with no 3.3V regulator in the path.
+
+> The user previously noted the screen became brighter when moved to 5V — this confirms the module accepts 5V input and has a separate internal regulator. If PCF still fails on 5V, the module's logic circuitry has a separate VDDIO pin that must also be checked — it may still be pulling from 3.3V.
+
+### Fix 2 — Add bulk capacitance near PCF8575 (hardware, always do this)
+
+Regardless of which power fix you choose, add decoupling at the PCF8575:
+
+- **100 µF electrolytic** between VCC (pin 24) and GND (pin 12) — as close to the chip as possible.
+- **100 nF ceramic** in parallel with the electrolytic.
+
+This prevents transient droops from resetting the PCF during OLED frame bursts.
+
+### Fix 3 — Add bulk capacitance on the 3.3V rail
+
+- **470 µF electrolytic** + **100 nF ceramic** near the Teensy 3.3V output pin.
+
+---
+
+## How to Verify the Fix
+
+After applying Fix 1 (OLED on 5V):
+
+1. Flash the combined diagnostic.
+2. Run Step 7 (timed poll). PCF should respond within 1–2 seconds.
+3. Run `c` (100-ping stability test). Should show 100% OK.
+4. Flash main firmware. Keyboard should work.
+
+If PCF still absent after Fix 1: the OLED module's logic VDDIO is still on 3.3V — check whether the module has a separate logic supply pin.
+
+---
+
+## What Was Ruled Out
+
+| Cause | Evidence |
+|-------|----------|
+| Wiring short (SPI↔I2C) | Short detect: clean |
+| Wrong OLED interface mode | I2C scan: no extra devices |
+| I2C bus locked (SDA stuck LOW) | Pin census: SDA HIGH at all times |
+| Missing I2C pull-ups | SDA/SCL HIGH before init |
+| Timing race (PCF slow to boot) | 10-second timed poll: no response at all |
 
 ---
 
 ## SSD1322 Interface Mode Reference
 
-The SSD1322 chip selects its host interface via BS0, BS1, BS2 hardware pins. On NHD modules these are configured by SMD resistors (R5 / R8 area).
+Interface selected via BS0, BS1, BS2 pins (set by SMD resistors R5/R8 on NHD modules).
 
-| BS2 | BS1 | BS0 | Interface      | Notes                                        |
-|-----|-----|-----|----------------|----------------------------------------------|
-|  1  |  0  |  0  | **4-wire SPI** | CS, SCLK, SDIN, D/C — **current mode**       |
-|  1  |  0  |  1  | 3-wire SPI     | CS, SCLK, SDIN; D/C embedded in data stream  |
-|  0  |  1  |  1  | 68xx parallel  | 6800-series 8-bit parallel bus               |
-|  0  |  1  |  0  | 80xx parallel  | 8080-series 8-bit parallel bus               |
-
-> Exact BS combinations vary by module manufacturer. Always check the datasheet for your specific board.
-
-**R5 / R8 resistors** on NHD modules set BS0 and BS1. Current configuration (SPI4 mode) is correct — verified: no unknown I2C devices appear after OLED init.
+| BS2 | BS1 | BS0 | Interface      | Notes                                          |
+|-----|-----|-----|----------------|------------------------------------------------|
+|  1  |  0  |  0  | **4-wire SPI** | CS, SCLK, SDIN, D/C — **current mode (correct)** |
+|  1  |  0  |  1  | 3-wire SPI     | D/C embedded in data stream                    |
+|  0  |  1  |  1  | 68xx parallel  | 6800-series 8-bit parallel bus                 |
+|  0  |  1  |  0  | 80xx parallel  | 8080-series 8-bit parallel bus                 |
 
 ---
 
@@ -72,41 +103,20 @@ The SSD1322 chip selects its host interface via BS0, BS1, BS2 hardware pins. On 
 | SCK    | 13        | OLED SCLK / SCK   |
 | MISO   | 12        | (not used)        |
 
-I2C pull-ups: 4.7 kΩ from SDA to 3.3 V and SCL to 3.3 V (required).
+I2C pull-ups: 4.7 kΩ from SDA to 3.3V, SCL to 3.3V.
 
 ---
 
 ## Diagnostic Tool
 
-Flash the combined diagnostic:
-
 ```
 pio run -e teensy41_combined_test -t upload
 ```
 
-Open Serial Monitor at 115200. Interactive commands:
-
 | Key | Action |
 |-----|--------|
-| `r` | Re-run pin census + I2C scan |
+| `r` | Pin census + I2C scan |
 | `p` | Pin census only |
 | `s` | SPI↔I2C short detect |
-| `c` | 100-round PCF ping stability test |
-
-If `c` shows 100% and setup shows 0% — pure power-on timing. Increase the `millis()` wait in `app.cpp`.
-
----
-
-## Other Causes (Ruled Out for This Hardware)
-
-These were considered and eliminated by the diagnostic:
-
-| Cause | Evidence | Status |
-|-------|----------|--------|
-| Wiring short (SPI↔I2C) | Short detect: no shorts | Ruled out |
-| Wrong OLED interface mode (I2C mode) | I2C scan: no unknown devices | Ruled out |
-| 3.3 V rail voltage droop | Interleaved ping test: 100% stable | Ruled out |
-| I2C bus locked (SDA stuck LOW) | Pin census: SDA HIGH at all times | Ruled out |
-| Missing I2C pull-ups | SDA/SCL HIGH at step 1 | Pull-ups present |
-
-If the symptom returns or changes, re-run the diagnostic and check which step fails first.
+| `c` | 100-round PCF stability ping |
+| `t` | Timed startup poll (up to 10s) |

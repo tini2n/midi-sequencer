@@ -281,12 +281,35 @@ void setup() {
         }
     }
 
+    // ── STEP 7: Timed startup poll — find exact PCF boot time ────────────────
+    hr("STEP 7 — Timed PCF startup poll (wait up to 10s)");
+    Serial.println("  Polling I2C every 100ms until PCF8575 responds...");
+    Wire.begin(); Wire.setClock(400000);
+    bool timedOk = false;
+    uint32_t startMs = millis();
+    while (millis() - startMs < 10000) {
+        uint32_t elapsed = millis() - startMs;
+        Wire.beginTransmission(PCF_ADDR);
+        if (Wire.endTransmission() == 0) {
+            Serial.printf("  PCF responded at T+%lums from this poll start\n",
+                          (unsigned long)elapsed);
+            Serial.printf("  (Total time from Teensy reset: ~%lums)\n",
+                          (unsigned long)millis());
+            timedOk = true;
+            break;
+        }
+        delay(100);
+    }
+    if (!timedOk)
+        Serial.println("  PCF did NOT respond within 10 seconds. Hardware problem — not a timing issue.");
+
     hr("DONE");
     Serial.println(F("Commands:"));
     Serial.println(F("  'r' — re-run steps 4+5 (pin census + I2C scan, OLED stays on)"));
     Serial.println(F("  'p' — pin census only"));
     Serial.println(F("  's' — SPI↔I2C short detect"));
     Serial.println(F("  'c' — PCF continuous ping test (100 pings, report failures)"));
+    Serial.println(F("  't' — timed startup poll (wait up to 10s for PCF to appear)"));
 }
 
 // ── loop ───────────────────────────────────────────────────────────────────
@@ -320,5 +343,24 @@ void loop() {
                       ok, fail, 100.0f * ok / 100);
         if (fail > 0)
             Serial.println(F("  PCF is unstable — check 3.3V cap, I2C pull-ups, and power-on delay."));
+    }
+    if (c == 't') {
+        hr("Timed startup poll (up to 10s)");
+        Wire.begin(); Wire.setClock(400000);
+        Serial.println("  Polling every 100ms...");
+        bool found = false;
+        uint32_t t0 = millis();
+        while (millis() - t0 < 10000) {
+            uint32_t el = millis() - t0;
+            Wire.beginTransmission(PCF_ADDR);
+            if (Wire.endTransmission() == 0) {
+                Serial.printf("  PCF found at T+%lums (total uptime ~%lums)\n",
+                              (unsigned long)el, (unsigned long)millis());
+                found = true;
+                break;
+            }
+            delay(100);
+        }
+        if (!found) Serial.println("  PCF not found within 10s.");
     }
 }
