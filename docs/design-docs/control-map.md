@@ -38,9 +38,12 @@ page     pitch    vel      length   steps
 | K1 (0) | Page offset ±1 | Reset page to 0 |
 | K2 (1) | Edit pitch ±1 semitone (0–127) | Reset pitch to C4 (60) |
 | K3 (2) | Edit velocity ±1 (1–127) | Reset velocity to 100 |
-| K4 (3) | Edit note length ±1 step (1–128) | Reset length to 1 step |
+| K4 (3) | Edit note length ±1 step (1–128) | Reset length to 1 step ⚠ SW broken — see below |
 | K5 (4) | Step count ±1 (hold K5 + turn = ±16) | — |
 | K6–K8  | Reserved | — |
+
+> **K4 SW** — push switch (pin 27) not triggering due to hardware miswiring. Rotation works normally.
+> **K7** — left rotation cross-triggers K8 SW events due to shared PCB trace (pins 22–23 / 31). Cannot be fixed in software. See `docs/design-docs/encoder-hardware.md`.
 
 ---
 

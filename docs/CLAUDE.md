@@ -89,7 +89,9 @@ Hold-step (step button held):
 
 **Settings mode (CTL 6):** K1 controls BPM (±0.5 per detent; press = reset to 120). Toggle via `RunLoop::consumeSettingsToggle()` checked in `App::update()`.
 
-Full control map: `docs/design-docs/control-map.md`.
+Full control map: `docs/design-docs/control-map.md`. Hardware wiring and known bugs: `docs/design-docs/encoder-hardware.md`.
+
+**Encoder direction:** K3, K4, K6, K7, K8 have A/B physically swapped. `EncoderManager::PinConfig.reversed = true` negates the delta in software. Do not rewire — this is the intended correction. K4 SW (pin 27) is broken in hardware. K7 left rotation cross-triggers K8 SW events (shared PCB trace — hardware bug, no software fix).
 
 `SerialMonitor` enables hardware-free testing: `A0,60,0` adds a note, `L` shows the grid, `p` plays.
 
