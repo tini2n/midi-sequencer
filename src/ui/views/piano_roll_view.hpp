@@ -15,7 +15,7 @@
 // Grid lines mark steps (dim), beats (dashed), and bars (solid).
 // Playhead is a bright vertical line at the current play tick.
 //
-// Viewport is driven by the cursor each frame:
+// Viewport is driven by the sequencer each frame:
 //   K1 (page)       → tickStart = page * 16 * ticksPerStep, tickSpan = 16 steps
 //   K2 (editPitch)  → pitchBase centres on editPitch
 class PianoRollView {
@@ -33,6 +33,7 @@ private:
     static constexpr uint8_t  GRID_Y   = HEADER_H;        // 8
     static constexpr uint8_t  GRID_H   = 64 - HEADER_H;   // 56
     static constexpr uint8_t  LANE_H   = 6;    // px per semitone lane (numLanes = 9)
+    static constexpr uint8_t  NOTE_H   = 2;    // note bar height, centred in its lane
     // ─────────────────────────────────────────────────────────────────────────
 
     Viewport viewport_{};

@@ -1,6 +1,6 @@
 #pragma once
 #include <Arduino.h>
-#include "matrix_kb_mode.hpp"
+#include "keyboard_mode.hpp"
 #include "../model/note.hpp"
 #include "../model/pattern.hpp"
 
@@ -22,7 +22,7 @@
 //   Shift + CTL 0 — clear step
 //   Shift + CTL 1 — copy step
 //   Shift + CTL 2 — paste step
-class CursorMode : public IMatrixKBMode {
+class SequencerMode : public IKeyboardMode {
 public:
     void onButtonDown(uint8_t btn, MidiIO& midi, uint8_t ch, void* context) override;
     void onButtonUp(uint8_t btn, MidiIO& midi, uint8_t ch, void* context) override;

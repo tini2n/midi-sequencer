@@ -4,7 +4,7 @@
 #include "../core/transport.hpp"
 #include "../core/midi_io.hpp"
 #include "../model/pattern.hpp"
-#include "cursor_mode.hpp"
+#include "sequencer_mode.hpp"
 
 // Lightweight USB serial command interface for testing without hardware UI.
 // Call poll() from App::update() — reads USB Serial, executes commands.
@@ -22,8 +22,8 @@
 // No String, no heap. Line buffer: char buf_[48].
 class SerialMonitor {
 public:
-    void attach(RunLoop* rl, Transport* tx, Pattern* pat, MidiIO* midi, CursorMode* cursor) {
-        rl_ = rl; tx_ = tx; pat_ = pat; midi_ = midi; cursor_ = cursor;
+    void attach(RunLoop* rl, Transport* tx, Pattern* pat, MidiIO* midi, SequencerMode* sequencer) {
+        rl_ = rl; tx_ = tx; pat_ = pat; midi_ = midi; sequencer_ = sequencer;
     }
 
     void poll() {
@@ -85,13 +85,13 @@ private:
         }
 
         if (op == 'L' || op == 'l') {
-            if (cursor_) {
+            if (sequencer_) {
+                uint8_t saved = sequencer_->getTrack();
                 for (uint8_t t = 0; t < MAX_TRACKS; t++) {
-                    cursor_->setTrack(t);
-                    cursor_->printTrackState(*pat_);
+                    sequencer_->setTrack(t);
+                    sequencer_->printTrackState(*pat_);
                 }
-                // Restore track
-                cursor_->setTrack(0);
+                sequencer_->setTrack(saved);
             } else {
                 printTracksRaw();
             }
@@ -113,10 +113,10 @@ private:
             uint8_t tr, pitch, step;
             if (parseCSV3(s + 1, tr, pitch, step)) {
                 if (tr < MAX_TRACKS && pitch <= 127 && step < pat_->steps) {
-                    if (cursor_) {
-                        uint8_t prevTr = cursor_->getTrack();
-                        cursor_->setTrack(tr);
-                        cursor_->setEditPitch(pitch);
+                    if (sequencer_) {
+                        uint8_t prevTr = sequencer_->getTrack();
+                        sequencer_->setTrack(tr);
+                        sequencer_->setEditPitch(pitch);
                         // Force add (not toggle — if already exists, skip)
                         NotePool<128>& pool = pat_->tracks[tr].recorded;
                         uint32_t tick = uint32_t(step) * (pat_->ticks() / pat_->steps);
@@ -128,8 +128,8 @@ private:
                             n.pitch = pitch; n.vel = 100;
                             pool.push(n); pool.sortByOnTick();
                         }
-                        cursor_->printTrackState(*pat_);
-                        cursor_->setTrack(prevTr);
+                        sequencer_->printTrackState(*pat_);
+                        sequencer_->setTrack(prevTr);
                     }
                 } else { Serial.println("ERR: A<tr>,<pitch>,<step>"); }
             } else { Serial.println("ERR: A<tr>,<pitch>,<step>"); }
@@ -147,7 +147,7 @@ private:
                         if (pool.notes[i].on == tick) pool.removeAt(i);
                         else ++i;
                     }
-                    if (cursor_) { uint8_t prev = cursor_->getTrack(); cursor_->setTrack(tr); cursor_->printTrackState(*pat_); cursor_->setTrack(prev); }
+                    if (sequencer_) { uint8_t prev = sequencer_->getTrack(); sequencer_->setTrack(tr); sequencer_->printTrackState(*pat_); sequencer_->setTrack(prev); }
                     else Serial.printf("Removed note at trk%u step%u\n", tr, step);
                 } else { Serial.println("ERR: X<tr>,<step>"); }
             } else { Serial.println("ERR: X<tr>,<step>"); }
@@ -210,7 +210,7 @@ private:
     Transport*   tx_{nullptr};
     Pattern*     pat_{nullptr};
     MidiIO*      midi_{nullptr};
-    CursorMode*  cursor_{nullptr};
+    SequencerMode*  sequencer_{nullptr};
 
     char buf_[48]{};
     int  bufLen_{0};

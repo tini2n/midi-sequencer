@@ -4,7 +4,7 @@
 #include "../core/runloop.hpp"
 #include "../core/transport.hpp"
 #include "pcf8575.hpp"
-#include "matrix_kb_mode.hpp"
+#include "keyboard_mode.hpp"
 #include "../model/scale.hpp"
 
 // PCF8575-based 3×8 matrix keyboard driver.
@@ -13,7 +13,7 @@
 //   rowBot (8–15) — bottom musical/step keys
 //   rowCtl (16+)  — control buttons (transport, shift, etc.)
 //
-// In step-sequencer (CursorMode), all 16 step buttons are passed to the active mode.
+// In step-sequencer (SequencerMode), all 16 step buttons are passed to the active mode.
 // In piano mode (no mode set), buttons are mapped to MIDI pitches via scale/fold logic.
 class MatrixKB {
 public:
@@ -41,7 +41,7 @@ public:
     void setVelocity(uint8_t v) { vel_ = v; }
     void setScale(Scale s)    { scale_ = s; }
     void setFold(bool f)      { fold_ = f; }
-    void setMode(IMatrixKBMode* m) { mode_ = m; }
+    void setMode(IKeyboardMode* m) { mode_ = m; }
     void setModeContext(void* ctx) { modeCtx_ = ctx; }
     // TODO: Phase 5 — attach ViewManager for view switching
     void attachViewManager(class ViewManager*) {}
@@ -60,7 +60,7 @@ private:
     Config        cfg_;
     RunLoop*      rl_{nullptr};
     Transport*    tx_{nullptr};
-    IMatrixKBMode* mode_{nullptr};
+    IKeyboardMode* mode_{nullptr};
     void*         modeCtx_{nullptr};
 
     bool     lastDown_[3][8]{};

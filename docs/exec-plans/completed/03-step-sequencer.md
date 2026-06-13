@@ -16,11 +16,11 @@
 ### 2. `src/io/pcf8575.hpp`
 PCF8575 I2C driver. All `Serial.printf` behind `#ifdef SEQUENCER_DEBUG`.
 
-### 3. `src/io/matrix_kb_mode.hpp`
-`IMatrixKBMode` interface + `IModeConfig` struct. Methods: `onButtonDown`, `onButtonUp`, `onControl`, `update`, `onActivate`, `onDeactivate`, `configure`, `getConfig`.
+### 3. `src/io/keyboard_mode.hpp`
+`IKeyboardMode` interface + `IModeConfig` struct. Methods: `onButtonDown`, `onButtonUp`, `onControl`, `update`, `onActivate`, `onDeactivate`, `configure`, `getConfig`.
 
-### 4. `src/io/cursor_mode.hpp` + `src/io/cursor_mode.cpp`
-Digitakt-style step editor implementing `IMatrixKBMode`:
+### 4. `src/io/sequencer_mode.hpp` + `src/io/sequencer_mode.cpp`
+Digitakt-style step editor implementing `IKeyboardMode`:
 - `pageOffset_` (uint8_t): base step = btn + pageOffset × 16. Encoder 0 controlled.
 - `trackIdx_` (uint8_t): which of the 2 tracks is active (0 or 1).
 - `editPitch_` (uint8_t): MIDI note assigned to new steps. Encoder 1 controlled.
@@ -32,7 +32,7 @@ Digitakt-style step editor implementing `IMatrixKBMode`:
 
 ### 5. `src/io/matrix_kb.hpp` + `src/io/matrix_kb.cpp`
 - `attach(RunLoop*, Transport*)` — no RecordEngine
-- Default mode: `CursorMode` (step sequencer mode)
+- Default mode: `SequencerMode` (step sequencer mode)
 - `attachViewManager()` is no-op stub (TODO: Phase 5)
 - All `Serial.printf` behind `#ifdef SEQUENCER_DEBUG`
 

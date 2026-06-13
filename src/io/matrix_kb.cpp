@@ -1,5 +1,5 @@
 #include "matrix_kb.hpp"
-#include "cursor_mode.hpp"
+#include "sequencer_mode.hpp"
 
 void MatrixKB::poll(MidiIO& midi, uint8_t ch) {
     uint32_t now = micros();
@@ -29,7 +29,7 @@ void MatrixKB::poll(MidiIO& midi, uint8_t ch) {
                 continue;
             }
 
-            // Delegate to active mode (e.g. CursorMode)
+            // Delegate to active mode (e.g. SequencerMode)
             if (mode_) {
                 if (down) mode_->onButtonDown((uint8_t)btn, midi, ch, modeCtx_);
                 else      mode_->onButtonUp((uint8_t)btn,   midi, ch, modeCtx_);
@@ -65,15 +65,15 @@ void MatrixKB::onControl(uint8_t c, bool down) {
     // Let mode handle it first (shift key, copy/paste, etc.)
     bool shift = false;
     if (mode_) {
-        // Query shift state from CursorMode if available
-        CursorMode* cm = static_cast<CursorMode*>(mode_);
+        // Query shift state from SequencerMode if available
+        SequencerMode* cm = static_cast<SequencerMode*>(mode_);
         shift = cm ? cm->isShiftPressed() : false;
         if (mode_->onControl(c, down, shift, modeCtx_)) return;
     }
 
     if (!down) return;
 
-    CursorMode* cm  = mode_ ? static_cast<CursorMode*>(mode_) : nullptr;
+    SequencerMode* cm  = mode_ ? static_cast<SequencerMode*>(mode_) : nullptr;
     Pattern*    pat = static_cast<Pattern*>(modeCtx_);
 
     switch (c) {

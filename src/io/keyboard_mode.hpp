@@ -4,7 +4,7 @@
 class MidiIO;
 class Pattern;
 
-// Configuration exchanged with keyboard modes (avoids tight coupling).
+// Configuration exchanged between keyboard modes (avoids tight coupling).
 struct IModeConfig {
     uint8_t root{0};
     int8_t  octave{4};
@@ -12,11 +12,11 @@ struct IModeConfig {
     uint8_t editPitch{60};
 };
 
-// Strategy interface for matrix keyboard behavior modes.
-// MatrixKB delegates button presses to the active mode.
-class IMatrixKBMode {
+// Strategy interface — defines what pressing a key *means*.
+// MatrixKB (hardware driver) delegates all button events to the active IKeyboardMode.
+class IKeyboardMode {
 public:
-    virtual ~IMatrixKBMode() = default;
+    virtual ~IKeyboardMode() = default;
 
     virtual void onButtonDown(uint8_t btn, MidiIO& midi, uint8_t ch, void* context) = 0;
     virtual void onButtonUp(uint8_t btn, MidiIO& midi, uint8_t ch, void* context) = 0;
@@ -26,7 +26,7 @@ public:
     virtual void configure(const IModeConfig& config) = 0;
     virtual void getConfig(IModeConfig& config) const = 0;
 
-    // Return true if the control event was handled by this mode (suppresses default handling).
+    // Return true if the control event was handled (suppresses MatrixKB default handling).
     virtual bool onControl(uint8_t c, bool down, bool shift, void* context) {
         (void)c; (void)down; (void)shift; (void)context;
         return false;

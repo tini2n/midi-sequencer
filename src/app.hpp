@@ -5,7 +5,7 @@
 #include "core/midi_io.hpp"
 #include "core/runloop.hpp"
 #include "engine/playback_engine.hpp"
-#include "io/cursor_mode.hpp"
+#include "io/sequencer_mode.hpp"
 #include "io/matrix_kb.hpp"
 #include "io/encoder_manager.hpp"
 #include "io/serial_monitor.hpp"
@@ -18,7 +18,7 @@ public:
     void setup();
     void update();
 
-    // IEncoderHandler — routes encoder events to cursor mode
+    // IEncoderHandler — routes encoder events to sequencer mode
     void onEncoderRotation(const EncoderRotationEvent& e) override;
     void onEncoderButton(const EncoderButtonEvent& e) override;
 
@@ -30,7 +30,7 @@ private:
     PlaybackEngine eng_;
     RunLoop        loop_;
 
-    CursorMode     cursor_;
+    SequencerMode     sequencer_;
     MatrixKB       kb_;
     EncoderManager enc_;
     SerialMonitor  serial_;

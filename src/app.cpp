@@ -46,9 +46,9 @@ void App::setup() {
     loop_.begin(&sched_, &tx_, &eng_, &midi_, &pat_);
 
     // Step editor — default: track 0, page 0, C4
-    cursor_.setTrack(0);
-    cursor_.setPage(0, pat_.steps);
-    cursor_.setEditPitch(60);
+    sequencer_.setTrack(0);
+    sequencer_.setPage(0, pat_.steps);
+    sequencer_.setEditPitch(60);
 
     // Matrix keyboard — PCF8575 needs time to stabilise on shared 3.3V rail.
     // Diagnostic showed it takes ~450ms from boot; pad to 600ms total here.
@@ -57,7 +57,7 @@ void App::setup() {
     kbCfg.address = cfg::PCF_ADDRESS;
     kb_.begin(kbCfg);
     kb_.attach(&loop_, &tx_);
-    kb_.setMode(&cursor_);
+    kb_.setMode(&sequencer_);
     kb_.setModeContext(&pat_);
 
     // Encoders
@@ -65,7 +65,7 @@ void App::setup() {
     enc_.setHandler(this);
 
     // Serial monitor
-    serial_.attach(&loop_, &tx_, &pat_, &midi_, &cursor_);
+    serial_.attach(&loop_, &tx_, &pat_, &midi_, &sequencer_);
 
     // OLED display
     oled_.begin();
@@ -73,12 +73,12 @@ void App::setup() {
 
     Serial.println("=== MIDI Sequencer ready ===");
     Serial.println("Type ? for serial commands.");
-    cursor_.onActivate();
+    sequencer_.onActivate();
 }
 
 void App::update() {
     serial_.poll();
-    kb_.poll(midi_, pat_.tracks[cursor_.getTrack()].channel);
+    kb_.poll(midi_, pat_.tracks[sequencer_.getTrack()].channel);
     screenMgr_.markDirty();  // keyboard may have toggled a note
     enc_.poll();
     loop_.service();
@@ -92,7 +92,7 @@ void App::update() {
     }
 
     // Draw display (rate-capped internally; dirty flag set by encoder/key handlers)
-    UICtx ctx{pat_, tx_, cursor_, micros(), settingsMode_};
+    UICtx ctx{pat_, tx_, sequencer_, micros(), settingsMode_};
     screenMgr_.draw(ctx);
 }
 
@@ -102,12 +102,12 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
 #ifdef SEQUENCER_DEBUG
     Serial.printf("[ENC] K%u %+d\n", e.encoderId + 1, e.delta);
 #endif
-    bool stepHeld = cursor_.getHeldStep() >= 0;
+    bool stepHeld = sequencer_.getHeldStep() >= 0;
 
     switch (e.encoderId) {
     case 0: // K1 — page offset (normal) | BPM (settings) | tick nudge (held)
         if (stepHeld) {
-            cursor_.editHeld(2, e.delta, pat_);
+            sequencer_.editHeld(2, e.delta, pat_);
         } else if (settingsMode_) {
             float bpm = pat_.tempo + e.delta * 0.5f;
             if (bpm < 20.f)  bpm = 20.f;
@@ -116,38 +116,38 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
             tx_.setTempo(bpm);
             Serial.printf("[SET] BPM=%.1f\n", bpm);
         } else {
-            int pg = (int)cursor_.getPage() + e.delta;
-            cursor_.setPage((uint8_t)(pg < 0 ? 0 : pg), pat_.steps);
+            int pg = (int)sequencer_.getPage() + e.delta;
+            sequencer_.setPage((uint8_t)(pg < 0 ? 0 : pg), pat_.steps);
         }
         break;
     case 1: // K2 — edit pitch (normal) | pitch (held)
         if (stepHeld) {
-            cursor_.editHeld(0, e.delta, pat_);
+            sequencer_.editHeld(0, e.delta, pat_);
         } else {
-            int p = (int)cursor_.getEditPitch() + e.delta;
+            int p = (int)sequencer_.getEditPitch() + e.delta;
             if (p < 0)   p = 0;
             if (p > 127) p = 127;
-            cursor_.setEditPitch((uint8_t)p);
+            sequencer_.setEditPitch((uint8_t)p);
         }
         break;
     case 2: // K3 — edit velocity (normal) | velocity (held)
         if (stepHeld) {
-            cursor_.editHeld(1, e.delta, pat_);
+            sequencer_.editHeld(1, e.delta, pat_);
         } else {
-            int v = (int)cursor_.getEditVelocity() + e.delta;
+            int v = (int)sequencer_.getEditVelocity() + e.delta;
             if (v < 1)   v = 1;
             if (v > 127) v = 127;
-            cursor_.setEditVelocity((uint8_t)v);
+            sequencer_.setEditVelocity((uint8_t)v);
         }
         break;
     case 3: // K4 — edit note length in steps (normal) | duration (held)
         if (stepHeld) {
-            cursor_.editHeld(3, e.delta, pat_);
+            sequencer_.editHeld(3, e.delta, pat_);
         } else {
-            int l = (int)cursor_.getEditLength() + e.delta;
+            int l = (int)sequencer_.getEditLength() + e.delta;
             if (l < 1)   l = 1;
             if (l > 128) l = 128;
-            cursor_.setEditLength((uint8_t)l);
+            sequencer_.setEditLength((uint8_t)l);
         }
         break;
     case 4: { // K5 — step count (±1, or ±16 if K5 button held)
@@ -174,16 +174,16 @@ void App::onEncoderButton(const EncoderButtonEvent& e) {
     case 0:
         if (!e.pressed) break;
         if (settingsMode_) { pat_.tempo = 120.f; tx_.setTempo(120.f); Serial.println("[SET] BPM reset to 120"); }
-        else               { cursor_.setPage(0, pat_.steps); }
+        else               { sequencer_.setPage(0, pat_.steps); }
         break;
     case 1:
-        if (e.pressed) cursor_.setEditPitch(60);      // reset to C4
+        if (e.pressed) sequencer_.setEditPitch(60);      // reset to C4
         break;
     case 2:
-        if (e.pressed) cursor_.setEditVelocity(100);  // reset to 100
+        if (e.pressed) sequencer_.setEditVelocity(100);  // reset to 100
         break;
     case 3:
-        if (e.pressed) cursor_.setEditLength(1);      // reset to 1 step
+        if (e.pressed) sequencer_.setEditLength(1);      // reset to 1 step
         break;
     case 4:
         k5Held_ = e.pressed;  // track hold state for ±16 step mode

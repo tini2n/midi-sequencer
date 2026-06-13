@@ -4,7 +4,7 @@
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 static uint8_t velToGray(uint8_t vel) {
-    return uint8_t(4 + (uint16_t(vel) * 11u) / 127u);
+    return uint8_t(2 + (uint16_t(vel) * 13u) / 127u);   // velocity 0..127 → gray 2..15
 }
 
 static void pitchName(uint8_t p, char out[5]) {
@@ -41,19 +41,19 @@ void PianoRollView::begin() {
 // ── Draw sub-routines ──────────────────────────────────────────────────────
 
 void PianoRollView::drawHeader(U8G2& gfx, const UICtx& ctx) {
-    // Inverted header: bright fill + black text — highest contrast, matches legacy approach.
+    // Black header bar with white text.
     // u8g2_font_5x7_tf baseline at y=7 (HEADER_H-1): glyphs fill y=1..7 inside the 8px row.
-    gfx.setDrawColor(15);
-    gfx.drawBox(0, 0, 256, HEADER_H);
+    gfx.setDrawColor(0);
+    gfx.drawBox(0, 0, 256, HEADER_H);   // clear header region to black
 
     gfx.setFont(u8g2_font_5x7_tf);
-    gfx.setDrawColor(0);   // black text on white/bright background
+    gfx.setDrawColor(15);   // white text on black background
 
     char buf[32];
     snprintf(buf, sizeof(buf), "%c  %.1fBPM  PG:%u/%u  %c",
-             char('A' + ctx.cursor.getTrack()),
+             char('A' + ctx.sequencer.getTrack()),
              double(ctx.pat.tempo),
-             unsigned(ctx.cursor.getPage() + 1),
+             unsigned(ctx.sequencer.getPage() + 1),
              unsigned((ctx.pat.steps + 15) / 16),
              ctx.transport.isRunning() ? '>' : ' ');
     gfx.drawStr(2, HEADER_H - 1, buf);
@@ -141,12 +141,12 @@ void PianoRollView::drawNotePool(U8G2& gfx, const NotePool<128>& pool) {
         if (x1 > gx1) x1 = gx1;
         if (x1 <= x0) continue;
 
-        int16_t  y = yFromPitch(n.pitch);
+        int16_t  y = yFromPitch(n.pitch) + (LANE_H - NOTE_H) / 2;  // centre note bar in lane
         uint16_t w = uint16_t(x1 - x0);
         if (w < 2) w = 2;
 
         gfx.setDrawColor(velToGray(n.vel));
-        gfx.drawBox(x0, y, w, LANE_H - 1);
+        gfx.drawBox(x0, y, w, NOTE_H);
     }
 
     gfx.setDrawColor(15);
@@ -166,17 +166,17 @@ void PianoRollView::draw(U8G2& gfx, const UICtx& ctx) {
     // K1 (page) → left/right scroll: each page = 16 steps fills the full width
     const uint32_t stepTicks = timebase::ticksPerStep(ctx.pat.grid);
     const uint32_t pageTicks = uint32_t(16) * stepTicks;
-    viewport_.tickStart = uint32_t(ctx.cursor.getPage()) * pageTicks;
+    viewport_.tickStart = uint32_t(ctx.sequencer.getPage()) * pageTicks;
     viewport_.tickSpan  = pageTicks;
 
     // K2 (editPitch) → up/down scroll: centre edit pitch in visible lanes
     const int16_t half = int16_t(numLanes()) / 2;
-    int16_t base = int16_t(ctx.cursor.getEditPitch()) - half;
+    int16_t base = int16_t(ctx.sequencer.getEditPitch()) - half;
     if (base < 0)   base = 0;
     if (base > 119) base = 119;
     viewport_.pitchBase = uint8_t(base);
 
-    const auto& track = ctx.pat.tracks[ctx.cursor.getTrack()];
+    const auto& track = ctx.pat.tracks[ctx.sequencer.getTrack()];
 
     drawGrid     (gfx, ctx);
     drawPianoKeys(gfx, ctx);
