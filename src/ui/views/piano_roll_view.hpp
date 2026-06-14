@@ -44,6 +44,8 @@ private:
     void drawGrid     (GrayCanvas& g, const UICtx& ctx);
     void drawNotePool (GrayCanvas& g, const NotePool<128>& pool);
     void drawPlayhead (GrayCanvas& g, const UICtx& ctx);
+    void drawTrackEnd (GrayCanvas& g, const UICtx& ctx);
+    void drawCursor   (GrayCanvas& g, const UICtx& ctx);
 
     // Tick → x pixel within the grid (may be outside LABEL_W..LABEL_W+GRID_W).
     int32_t xFromTick (uint32_t tick)  const;

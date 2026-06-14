@@ -89,11 +89,10 @@ void MatrixKB::onControl(uint8_t c, bool down) {
     case 2: // STOP
         if (rl_) rl_->post(AppEvent{AppEvent::Type::Stop});
         break;
-    case 3: // NEXT PAGE (Shift = prev page)
+    case 3: // NEXT WINDOW (Shift = prev) — jump the cursor by one screen of buckets
         if (cm && pat) {
-            uint8_t page = cm->getPage();
-            if (shift) cm->setPage(page > 0 ? page - 1 : 0, pat->steps);
-            else        cm->setPage(page + 1, pat->steps);
+            int span = (int)seq::visibleSpanTicks(pat->grid);
+            cm->moveCursor(shift ? -span : span, *pat);
         }
         break;
     case 4: // MODE — cycle keyboard mode (only sequencer mode for now)

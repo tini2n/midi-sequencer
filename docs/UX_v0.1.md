@@ -21,7 +21,13 @@ Design principles:
 
 ## 2. Hardware surface
 
-Live in hardware.md
+| Module | Spec | Role |
+|---|---|---|
+| Pad grid | 16 RGB buttons, 2×8 | Time cursor / piano keyboard / track ops (while TRACK held) |
+| Control buttons | 8 | PLAY, STOP, REC, SHIFT, GEN, KEYS, TRACK, SET |
+| Encoders | 8 clickable (6 functional in current build — UI designed for 6) | Navigation + parameter editing |
+| Display | OLED 256×64 mono | Piano roll + header + tool panels |
+| MIDI | 1× IN, 1× OUT (3× OUT planned for production) | Clock + notes |
 
 ---
 
@@ -40,7 +46,7 @@ No patterns, no scenes in v1. Each track is one looping sequence.
 ### 3.2 Track
 
 - Polyphonic MIDI sequence.
-- Own length in steps **[OPEN: max length — 16? 32? 64?]**.
+- Length: 1–128 steps (1 step = one 1/16 = 24 ticks). Stored absolutely in ticks; never affected by the view's GRID setting.
 - Assigned to a MIDI channel.
 - **Channel exclusivity rule:** a MIDI channel can have only one *active* track. If several tracks are assigned to the same channel, all but one are auto-muted. Unmuting one of them mutes the currently active one (last-unmuted-wins).
 
@@ -57,7 +63,25 @@ Note { pitch, velocity, start_tick, length_ticks }
 - Position and length are both tick-based → microtiming and off-grid recording come for free.
 - Live recording captures **raw ticks** (no forced snap); quantization is a Tool applied afterwards (§6.3).
 
-### 3.5 Length display convention
+### 3.5 GRID, zoom & length — one lens, three jobs
+
+Three concepts that must stay distinct, even though one knob (E4) drives the first:
+
+1. **GRID** — the active resolution. Sets three things at once: the snap, the default length of newly created notes, and the zoom. Range 1/64 … 1/4. Bigger grid = each pad covers more time = view zooms out; smaller grid = zooms in. Changed with E4 when nothing is held.
+2. **A note's own length** — stored per note in ticks, independent of GRID. Edited by holding that note and turning E4 (Shift+E4 = single ticks). **A note keeps its length when GRID/zoom changes** — zooming never resizes existing notes.
+3. **Track length** — stored absolutely (§3.2). Never measured in "pages," because a page = 16 grid cells = a different duration at each zoom. E5 edits it in 1/16 steps; Shift+E5 in bars (×16).
+
+The 16 pads always represent **16 buckets of the currently visible window** (per the cursor model), so their time-span follows GRID:
+
+| GRID | Each pad covers | 16 pads span |
+|---|---|---|
+| 1/8 | 1/8 note | 2 bars (zoomed out) |
+| 1/16 | 1/16 note | 1 bar (default) |
+| 1/32 | 1/32 note | ½ bar (zoomed in) |
+
+New-note length = one grid cell (couples to zoom by design). Existing-note length wins on zoom.
+
+### 3.6 Length display convention
 
 Show note lengths musically when clean (`1/16`, `1/8`, `1/8·`), otherwise as `steps:ticks` (e.g. `2:13`).
 
@@ -107,19 +131,23 @@ Pad LED logic:
 - **Playhead flash** — transport passing over the bucket.
 
 Interactions:
-- Press unlit pad → create note at cursor's pitch lane, grid-aligned, default length.
-- Press lit pad → select that note (focus on piano roll).
-- Hold pad + turn encoder → edit that step directly.
+- Press unlit pad → create note at cursor's pitch lane, at the bucket start, length = one grid cell.
+- Press lit pad → select the note in that bucket (focus on piano roll).
+- Hold pad + turn encoder → edit that note directly.
 
-Encoder map (no step held):
+Encoder map (no note held):
 
 | E1 | E2 | E3 | E4 | E5 | E6 |
 |---|---|---|---|---|---|
-| Cursor X / scroll | Pitch lane Y / octave scroll | Velocity (selected) | Note length | Track length | BPM |
+| Cursor X (move by 1 step) | Pitch lane Y / octave scroll | Velocity (selected) | **GRID** (= zoom = default length) | Track length (1/16 steps) | BPM |
 
-Encoder map (step held): E1–E4 retarget to **that note's** position (ticks) / pitch / velocity / length.
+Navigation modifiers:
+- **Shift+E1** → page by one screenful (16 buckets).
+- **Shift+E5** → track length in bars (×16).
 
-Shift+E4 = length in single ticks (fine). Shift+E1 = position nudge in ticks **[OPEN: confirm]**.
+Encoder map (note held): E1–E4 retarget to **that note's** position (ticks) / pitch / velocity / length. Shift+E4 = length in single ticks. Shift+E1 (held) = position nudge in ticks.
+
+> A "page" (16 buckets) is a viewing/navigation unit whose duration follows GRID — fine for jumping the view, never used to measure track length.
 
 ### 5.3 KEYS layout (pads as keyboard)
 
@@ -211,7 +239,21 @@ Strength moves each note proportionally toward the grid — 100% = hard snap.
 
 ---
 
-## 8. Decisions log
+## 8. Performance & architecture rules (engine constraints)
+
+Target: Teensy 4.1 (600 MHz Cortex-M7, 1 MB RAM). Headroom is large; lag only appears if these rules are broken.
+
+- **Timing logic never touches the display.** The tick handler schedules MIDI only — no draw calls, no allocation. (Scheduling load for hundreds of notes at 96 PPQN is <1% CPU.)
+- **No dynamic allocation in the audio/timing path.** Notes live in a fixed array; a note ≈ 6–8 bytes, so thousands of notes fit comfortably in RAM.
+- **Renderer culls to the visible tick window before iterating notes.** Render cost is then bounded by screen width (~256 px), not by how many notes the track holds. A fully-filled 128-step track only ever draws the handful of notes currently on screen.
+- **Keep notes sorted by start tick** (or maintain a small active-note window) so the scheduler scans only notes near the playhead.
+- **Redraw at a frame cadence (~30–60 fps), not per tick.** The real cost is pushing the framebuffer to the OLED over SPI (~1–2 ms/frame), so render only when something changed.
+
+Consequence: 4 tracks fully filled at fine resolution is a non-event; the device has room for far more before the Teensy notices.
+
+---
+
+## 9. Decisions log
 
 | # | Decision | Status |
 |---|---|---|
@@ -228,14 +270,19 @@ Strength moves each note proportionally toward the grid — 100% = hard snap.
 | 11 | Pad velocity: encoder "brush" + hold-pad fine edit | ✓ |
 | 12 | Octave shift via encoder | ✓ |
 | 13 | KEYS default = piano layout | ✓ |
+| 14 | Track length 1–128 steps, stored in ticks | ✓ |
+| 15 | GRID (E4) = snap + default length + zoom; pads = 16 buckets of visible window | ✓ |
+| 16 | New note = one grid cell; existing notes keep length on zoom | ✓ |
+| 17 | E1 = move 1 step, Shift+E1 = page (16 buckets); length never measured in pages | ✓ |
+| 18 | Engine rules: cull-before-render, no alloc/draw in timing path | ✓ |
 
-## 9. Open questions queue
+## 10. Open questions queue
 
-1. Max track length, and page navigation on the piano roll when length > 16 steps (cursor window paging).
-2. Euclid pitch behavior: rhythm-on-one-pitch vs. melodic spread across scale.
-3. TRACK-held encoder mapping (channel, length per track).
-4. Settings page full contents.
-5. Shift hint bar on OLED when SHIFT held.
-6. Count-in and loop-seam behavior for recording.
-7. Audible ghost preview in v1 — feasible on the scheduler?
-8. Save/load — does v1 persist anything (SD/flash)?
+1. Euclid pitch behavior: rhythm-on-one-pitch vs. melodic spread across scale (a `spread` param — distribution rule: deterministic cycle vs. seeded random).
+2. TRACK-held encoder mapping (channel, length per track).
+3. Settings page full contents.
+4. Shift hint bar on OLED when SHIFT held.
+5. Recording details parked for hardware testing: count-in, loop-seam behavior, touch-to-freeze-window anti-drift.
+6. Audible ghost preview in v1 — feasible on the scheduler?
+7. Save/load — does v1 persist anything (SD/flash)?
+8. Sequencer editing still to design: polyphony in one bucket (select/cycle), note deletion, range selection, empty-bucket context actions.

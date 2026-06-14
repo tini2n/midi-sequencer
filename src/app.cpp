@@ -30,10 +30,12 @@ void App::setup() {
     Serial.begin(115200);
     delay(500); // let serial port settle
 
-    // Pattern: empty, 16 steps, 120 BPM
+    // Pattern: empty, 64 steps @ 1/16, 120 BPM (max track length is 128 steps).
+    // pat_.steps is the interim single playback loop length (Phase A); per-track
+    // lenTicks (default 1536 = 64 steps) drives the editor and, in Phase B, playback.
     pat_.tempo = 120.f;
     pat_.grid  = 16;
-    pat_.steps = 16;
+    pat_.steps = 64;
     pat_.tracks[0].channel = 1;
     pat_.tracks[1].channel = 2;
 
@@ -45,9 +47,8 @@ void App::setup() {
     eng_.reset();
     loop_.begin(&sched_, &tx_, &eng_, &midi_, &pat_);
 
-    // Step editor — default: track 0, page 0, C4
+    // Step editor — default: track 0, cursor at 0, C5
     sequencer_.setTrack(0);
-    sequencer_.setPage(0, pat_.steps);
     sequencer_.setEditPitch(60);
 
     // Matrix keyboard — PCF8575 needs time to stabilise on shared 3.3V rail.
@@ -102,11 +103,13 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
 #ifdef SEQUENCER_DEBUG
     Serial.printf("[ENC] K%u %+d\n", e.encoderId + 1, e.delta);
 #endif
-    bool stepHeld = sequencer_.getHeldStep() >= 0;
+    const bool     held  = sequencer_.getHeldTick() >= 0;
+    const bool     shift = sequencer_.isShiftPressed();   // CTL7
+    const uint32_t g     = seq::gridTicks(pat_.grid);
 
     switch (e.encoderId) {
-    case 0: // K1 — page offset (normal) | BPM (settings) | tick nudge (held)
-        if (stepHeld) {
+    case 0: // E1 — move cursor by grid (Shift = ×16) | BPM (settings) | tick nudge (held)
+        if (held) {
             sequencer_.editHeld(2, e.delta, pat_);
         } else if (settingsMode_) {
             float bpm = pat_.tempo + e.delta * 0.5f;
@@ -116,12 +119,11 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
             tx_.setTempo(bpm);
             Serial.printf("[SET] BPM=%.1f\n", bpm);
         } else {
-            int pg = (int)sequencer_.getPage() + e.delta;
-            sequencer_.setPage((uint8_t)(pg < 0 ? 0 : pg), pat_.steps);
+            sequencer_.moveCursor(e.delta * int(g) * (shift ? 16 : 1), pat_);
         }
         break;
-    case 1: // K2 — edit pitch (normal) | pitch (held)
-        if (stepHeld) {
+    case 1: // E2 — cursor pitch lane (held: edit note pitch)
+        if (held) {
             sequencer_.editHeld(0, e.delta, pat_);
         } else {
             int p = (int)sequencer_.getEditPitch() + e.delta;
@@ -130,8 +132,8 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
             sequencer_.setEditPitch((uint8_t)p);
         }
         break;
-    case 2: // K3 — edit velocity (normal) | velocity (held)
-        if (stepHeld) {
+    case 2: // E3 — velocity (held: edit note velocity)
+        if (held) {
             sequencer_.editHeld(1, e.delta, pat_);
         } else {
             int v = (int)sequencer_.getEditVelocity() + e.delta;
@@ -140,26 +142,18 @@ void App::onEncoderRotation(const EncoderRotationEvent& e) {
             sequencer_.setEditVelocity((uint8_t)v);
         }
         break;
-    case 3: // K4 — edit note length in steps (normal) | duration (held)
-        if (stepHeld) {
+    case 3: // E4 — grid / zoom (held: edit note duration in grid cells)
+        if (held) {
             sequencer_.editHeld(3, e.delta, pat_);
         } else {
-            int l = (int)sequencer_.getEditLength() + e.delta;
-            if (l < 1)   l = 1;
-            if (l > 128) l = 128;
-            sequencer_.setEditLength((uint8_t)l);
+            pat_.grid = seq::cycleGrid(pat_.grid, e.delta);
+            sequencer_.onGridChanged(pat_);
+            Serial.printf("[Sequencer] grid -> 1/%u\n", pat_.grid);
         }
         break;
-    case 4: { // K5 — step count (±1, or ±16 if K5 button held)
-        int delta = k5Held_ ? e.delta * 16 : e.delta;
-        int steps = (int)pat_.steps + delta;
-        if (steps < 1)   steps = 1;
-        if (steps > 255) steps = 255;
-        pat_.steps = (uint8_t)steps;
-        tx_.setLoopLen(pat_.ticks());
-        Serial.printf("Steps=%d  ticks=%lu\n", steps, (unsigned long)pat_.ticks());
+    case 4: // E5 — focused track length by grid (Shift = ×16)
+        sequencer_.editTrackLen(e.delta * int(g) * (shift ? 16 : 1), pat_);
         break;
-    }
     default:
         break;
     }
@@ -171,22 +165,22 @@ void App::onEncoderButton(const EncoderButtonEvent& e) {
     Serial.printf("[ENC] K%u %s\n", e.encoderId + 1, e.pressed ? "press" : "release");
 #endif
     switch (e.encoderId) {
-    case 0:
+    case 0: // E1 press — reset BPM (settings) | cursor to start
         if (!e.pressed) break;
         if (settingsMode_) { pat_.tempo = 120.f; tx_.setTempo(120.f); Serial.println("[SET] BPM reset to 120"); }
-        else               { sequencer_.setPage(0, pat_.steps); }
+        else               { sequencer_.moveCursor(-(int)sequencer_.getCursorTick(), pat_); }
         break;
-    case 1:
-        if (e.pressed) sequencer_.setEditPitch(60);      // reset to C4
+    case 1: // E2 press — reset pitch to C5
+        if (e.pressed) sequencer_.setEditPitch(60);
         break;
-    case 2:
-        if (e.pressed) sequencer_.setEditVelocity(100);  // reset to 100
+    case 2: // E3 press — reset velocity to 100
+        if (e.pressed) sequencer_.setEditVelocity(100);
         break;
-    case 3:
-        if (e.pressed) sequencer_.setEditLength(1);      // reset to 1 step
+    case 3: // E4 press — reset grid to 1/16
+        if (e.pressed) { pat_.grid = 16; sequencer_.onGridChanged(pat_); Serial.println("[Sequencer] grid -> 1/16"); }
         break;
-    case 4:
-        k5Held_ = e.pressed;  // track hold state for ±16 step mode
+    case 4: // E5 press — reset focused track length to default (128 steps)
+        if (e.pressed) sequencer_.editTrackLen(int(seq::TRACK_LEN_MAX_TICKS), pat_);
         break;
     default:
         break;

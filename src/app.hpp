@@ -39,5 +39,4 @@ private:
     ScreenManager  screenMgr_;
 
     bool    settingsMode_{false}; // true while CTL 6 (SETTINGS) is active
-    bool    k5Held_{false};       // encoder 4 button held → ±16 step mode
 };

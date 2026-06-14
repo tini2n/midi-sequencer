@@ -17,7 +17,7 @@ struct LayeredTrack {
     NotePool<128> generative;  // up to 128 generator-produced notes
 
     uint8_t  channel{1};       // MIDI channel 1–16
-    uint32_t steps{0};         // per-track length override in ticks; 0 = use Pattern::steps
+    uint32_t lenTicks{1536};   // per-track loop length, absolute ticks (default 64 steps @ 1/16; max 3072)
 
     // Clear both layers. Does not change channel or steps.
     void clear() {
