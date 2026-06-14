@@ -42,12 +42,11 @@ public:
         dirty_      = false;
         lastDrawUs_ = ctx.now;
 
-        U8G2& gfx = oled_->gfx();
         oled_->clear();
 
         switch (current_) {
-            case ScreenId::PianoRoll: pianoRoll_.draw(gfx, ctx); break;
-            case ScreenId::Settings:  settings_ .draw(gfx, ctx); break;
+            case ScreenId::PianoRoll: pianoRoll_.draw(*oled_, ctx); break;
+            case ScreenId::Settings:  settings_ .draw(*oled_, ctx); break;
         }
 
         oled_->send();

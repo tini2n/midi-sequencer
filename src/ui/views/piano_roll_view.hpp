@@ -2,6 +2,7 @@
 #include <U8g2lib.h>
 #include "../ui_ctx.hpp"
 #include "../viewport.hpp"
+#include "../oled_renderer.hpp"
 #include "../../model/note_pool.hpp"
 
 // Primary view: piano roll for the active track.
@@ -21,7 +22,7 @@
 class PianoRollView {
 public:
     void begin();
-    void draw(U8G2& gfx, const UICtx& ctx);
+    void draw(OledRenderer& oled, const UICtx& ctx);
 
     Viewport& viewport() { return viewport_; }
 
@@ -40,9 +41,9 @@ private:
 
     void drawHeader   (U8G2& gfx, const UICtx& ctx);
     void drawPianoKeys(U8G2& gfx, const UICtx& ctx);
-    void drawGrid     (U8G2& gfx, const UICtx& ctx);
-    void drawNotePool (U8G2& gfx, const NotePool<128>& pool);
-    void drawPlayhead (U8G2& gfx, const UICtx& ctx);
+    void drawGrid     (GrayCanvas& g, const UICtx& ctx);
+    void drawNotePool (GrayCanvas& g, const NotePool<128>& pool);
+    void drawPlayhead (GrayCanvas& g, const UICtx& ctx);
 
     // Tick → x pixel within the grid (may be outside LABEL_W..LABEL_W+GRID_W).
     int32_t xFromTick (uint32_t tick)  const;

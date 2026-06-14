@@ -3,8 +3,9 @@
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+// MIDI velocity 0–127 → gray level 1–15 (1 = barely-lit pp, 15 = full ff).
 static uint8_t velToGray(uint8_t vel) {
-    return uint8_t(2 + (uint16_t(vel) * 13u) / 127u);   // velocity 0..127 → gray 2..15
+    return uint8_t(1 + (uint16_t(vel) * 14u) / 127u);
 }
 
 static void pitchName(uint8_t p, char out[5]) {
@@ -94,7 +95,7 @@ void PianoRollView::drawPianoKeys(U8G2& gfx, const UICtx& ctx) {
 // Grid: vertical dotted beat/bar markers.
 // Bars (every 16 steps): brighter dot column (gray-6), every 3 pixels vertically.
 // Beats (every 4 steps):  dimmer dot column (gray-3), every 3 pixels vertically.
-void PianoRollView::drawGrid(U8G2& gfx, const UICtx& ctx) {
+void PianoRollView::drawGrid(GrayCanvas& g, const UICtx& ctx) {
     const uint32_t stepT = timebase::ticksPerStep(ctx.pat.grid);
     const uint32_t beatT = stepT * 4;
     const uint32_t barT  = stepT * 16;
@@ -111,17 +112,16 @@ void PianoRollView::drawGrid(U8G2& gfx, const UICtx& ctx) {
         if (isBar || isBeat) {
             int32_t x = xFromTick(tick);
             if (x > LABEL_W && x < gx1) {
-                gfx.setDrawColor(isBar ? 6 : 3);
+                uint8_t gray = isBar ? 6 : 3;
                 for (int16_t y = GRID_Y; y < GRID_Y + GRID_H; y += 3)
-                    gfx.drawPixel(x, y);
+                    g.setPixel(x, y, gray);
             }
         }
         s++;
     }
-    gfx.setDrawColor(15);
 }
 
-void PianoRollView::drawNotePool(U8G2& gfx, const NotePool<128>& pool) {
+void PianoRollView::drawNotePool(GrayCanvas& g, const NotePool<128>& pool) {
     const int32_t  gx0   = LABEL_W;
     const int32_t  gx1   = LABEL_W + GRID_W;
     const uint8_t  lanes = numLanes();
@@ -145,24 +145,26 @@ void PianoRollView::drawNotePool(U8G2& gfx, const NotePool<128>& pool) {
         uint16_t w = uint16_t(x1 - x0);
         if (w < 2) w = 2;
 
-        gfx.setDrawColor(velToGray(n.vel));
-        gfx.drawBox(x0, y, w, NOTE_H);
+        g.fillRect(x0, y, w, NOTE_H, velToGray(n.vel));   // body brightness = velocity
+        // Leading 2×NOTE_H block always full bright — marks the note onset clearly.
+        g.fillRect(x0, y, w < 2 ? w : 2, NOTE_H, 15);
     }
-
-    gfx.setDrawColor(15);
 }
 
-void PianoRollView::drawPlayhead(U8G2& gfx, const UICtx& ctx) {
+void PianoRollView::drawPlayhead(GrayCanvas& g, const UICtx& ctx) {
     if (!ctx.transport.isRunning()) return;
     int32_t x = xFromTick(ctx.transport.playTick());
     if (x < LABEL_W || x >= LABEL_W + GRID_W) return;
-    gfx.setDrawColor(15);
-    gfx.drawVLine(x, GRID_Y, GRID_H);
+    for (int16_t y = GRID_Y; y < GRID_Y + GRID_H; ++y)
+        g.setPixel(x, y, 15);
 }
 
 // ── Main draw entry point ──────────────────────────────────────────────────
 
-void PianoRollView::draw(U8G2& gfx, const UICtx& ctx) {
+void PianoRollView::draw(OledRenderer& oled, const UICtx& ctx) {
+    U8G2&       gfx = oled.gfx();    // 1-bit layer: header text, piano-key labels
+    GrayCanvas& g   = oled.gray();   // gray layer: grid, notes, playhead
+
     // K1 (page) → left/right scroll: each page = 16 steps fills the full width
     const uint32_t stepTicks = timebase::ticksPerStep(ctx.pat.grid);
     const uint32_t pageTicks = uint32_t(16) * stepTicks;
@@ -178,10 +180,13 @@ void PianoRollView::draw(U8G2& gfx, const UICtx& ctx) {
 
     const auto& track = ctx.pat.tracks[ctx.sequencer.getTrack()];
 
-    drawGrid     (gfx, ctx);
+    // Gray layer (bottom→top): grid behind notes, playhead on top.
+    drawGrid     (g, ctx);
+    drawNotePool (g, track.recorded);
+    drawNotePool (g, track.generative);
+    drawPlayhead (g, ctx);
+
+    // 1-bit layer — composited over the gray layer at full brightness in send().
     drawPianoKeys(gfx, ctx);
-    drawNotePool (gfx, track.recorded);
-    drawNotePool (gfx, track.generative);
-    drawPlayhead (gfx, ctx);
-    drawHeader   (gfx, ctx);   // drawn last so it covers any overdraw above y=13
+    drawHeader   (gfx, ctx);
 }

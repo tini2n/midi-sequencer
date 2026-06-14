@@ -258,7 +258,7 @@ void SequencerMode::editHeld(uint8_t param, int8_t delta, Pattern& pat) {
 const char* SequencerMode::pitchName(uint8_t pitch, char* buf, uint8_t bufLen) {
     static const char* names[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
     if (bufLen < 5) { buf[0] = '\0'; return buf; }
-    int8_t oct = (pitch / 12) - 1;
+    int8_t oct = pitch / 12;   // note 0 = C0 (matches the piano-roll display)
     snprintf(buf, bufLen, "%s%d", names[pitch % 12], oct);
     return buf;
 }

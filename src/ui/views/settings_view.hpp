@@ -1,13 +1,17 @@
 #pragma once
 #include <U8g2lib.h>
 #include "../ui_ctx.hpp"
+#include "../oled_renderer.hpp"
 
 // Full-screen settings overlay (shown when CTL 6 / settingsMode is active).
 // Displays BPM in a large font with encoder hints.
+// All text is drawn into U8g2's 1-bit layer; it is composited onto the gray
+// canvas at full brightness in OledRenderer::send().
 // Header-only — small enough to not need a .cpp.
 class SettingsView {
 public:
-    void draw(U8G2& gfx, const UICtx& ctx) {
+    void draw(OledRenderer& oled, const UICtx& ctx) {
+        U8G2& gfx = oled.gfx();
         // Title bar
         gfx.setFont(u8g2_font_5x7_tf);
         gfx.setDrawColor(6);
