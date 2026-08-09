@@ -24,8 +24,6 @@ A polyphonic, performance-first MIDI step sequencer built on the Teensy 4.1. 16 
 | Display | SSD1322 256×64 OLED, 4-wire SPI | Piano roll UI |
 | MIDI | 1× IN, 1× OUT | Clock + notes |
 
-See [`.claude/design-docs/control-map.md`](.claude/design-docs/control-map.md) for the full button/encoder mapping and known hardware quirks, and [`.claude/references/midi-protocol.md`](.claude/references/midi-protocol.md) for MIDI wiring/protocol notes.
-
 ## Building
 
 Built with [PlatformIO](https://platformio.org/).
@@ -74,12 +72,16 @@ Both are used here via a small `EncoderManager` (`src/io/encoder_manager.hpp`) t
 
 ## Project status
 
-Mid-refactor, actively developed. See [`.claude/PLANS.md`](.claude/PLANS.md) for the phased roadmap and [`.claude/exec-plans/`](.claude/exec-plans/) for in-flight design docs. Data model, core MIDI pipeline, and the step sequencer control surface are done; the generator subsystem and OLED UI are in progress.
+Mid-refactor, actively developed.
+
+- **Done** — data model (fixed-size `NotePool`, layered `Pattern`), core MIDI pipeline (ISR → scheduler → transport → playback engine), step sequencer control surface (pad grid, encoders, serial monitor)
+- **In progress** — SSD1322 piano-roll OLED UI
+- **Next up** — generator subsystem: a non-destructive Euclidean rhythm generator that writes into each track's generative layer via a staging buffer, swapped in atomically from the run loop so it never mutates state mid-playback. Later phases add Markov chain, probability-grid, and cellular-automata generators on the same interface.
 
 ## Known issues
 
-- K4 encoder's push switch isn't registering presses — suspected wiring/solder fault, rotation is unaffected. See `.claude/design-docs/control-map.md`.
+- K4 encoder's push switch isn't registering presses — suspected wiring/solder fault, rotation is unaffected.
 
 ## License
 
-No license specified yet — all rights reserved by default.
+[GPL-3.0](LICENSE) — modified versions, including in commercial products, must also be released under GPL-3.0.
