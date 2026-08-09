@@ -9,20 +9,21 @@
 // negated in software so L always gives −1, R always gives +1.
 //
 // Known hardware issues (do not reorder wires — fix here in software):
+//   Avoid pins 11/12/13 for pinSW — Teensy 4.1 hardware SPI0 (MOSI/MISO/SCK).
+//     oled_.begin() calls SPI.begin(), which reclaims those pins for the SPI
+//     peripheral and overrides any INPUT_PULLUP set on them.
 //   K4 SW (pin 27): switch not triggering — pinSW likely miswired or floating.
-//   K7 left rotation cross-triggers K8 SW events — pinA or pinB of K7 is
-//     shared with pinSW of K8 on the PCB; cannot be fixed in software.
 //
 // Normal mode:  K1=page  K2=pitch  K3=velocity  K4=length  K5=step count
 // Held-step:    K1=nudge K2=pitch  K3=vel        K4=duration
 static const EncoderManager::PinConfig kEncoderPins[EncoderManager::NUM_ENCODERS] = {
     {2,  3,  0,  false},  // K1 — page offset     | held: tick nudge
-    {4,  5,  12, false},  // K2 — edit pitch       | held: pitch
+    {4,  5,  32, false},  // K2 — edit pitch       | held: pitch
     {6,  7,  26, true },  // K3 — edit velocity    | held: velocity  (A/B swapped)
     {14, 15, 27, true },  // K4 — edit note length | held: duration  (A/B swapped; SW broken)
     {16, 17, 28, false},  // K5 — step count
     {20, 21, 29, true },  // K6 — reserved                           (A/B swapped)
-    {22, 23, 30, true },  // K7 — reserved         (A/B swapped; left rotation triggers K8 SW)
+    {22, 23, 30, true },  // K7 — reserved                           (A/B swapped)
     {24, 25, 31, true },  // K8 — reserved                           (A/B swapped)
 };
 
