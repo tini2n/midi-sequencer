@@ -1,6 +1,6 @@
-# MIDI Sequencer
+# TeensyStep
 
-A polyphonic, performance-first MIDI step sequencer built on the Teensy 4.1. Digitakt-inspired: 16 pad buttons act as step slots, toggling notes on/off per track. No audio synthesis — it only produces MIDI, driven out over hardware MIDI DIN with sample-accurate timing from a dedicated ISR clock.
+A polyphonic, performance-first MIDI step sequencer built on the Teensy 4.1. 16 pad buttons act as step slots, toggling notes on/off per track. No audio synthesis — it only produces MIDI, driven out over hardware MIDI DIN with sample-accurate timing from a dedicated ISR clock.
 
 ## Features
 
