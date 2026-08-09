@@ -61,6 +61,17 @@ src/
   app.cpp   wiring/composition root, encoder & pin assignments
 ```
 
+## Reusable modules
+
+A couple of files under `src/io/` are self-contained and dependency-free — no coupling to the sequencer's data model or app wiring. Lift them directly into other Arduino/Teensy/PlatformIO projects:
+
+- **[`src/io/encoder.hpp`](src/io/encoder.hpp)** — single-header EC11 rotary encoder driver. Gray-code quadrature decoding via a 4×4 state table, emits exactly ±1 per detent (discards pre-click mechanical noise), corrects for A/B-swapped wiring in software (`reversed` flag), and debounces an integrated push switch. No allocation, no dependencies beyond `Arduino.h`.
+- **[`src/io/pcf8575.hpp`](src/io/pcf8575.hpp)** — minimal PCF8575 16-bit I2C I/O expander driver (read/write, configurable address and bus speed).
+
+Both are used here via a small `EncoderManager` (`src/io/encoder_manager.hpp`) that fans out to a handler interface for up to 8 encoders — a useful pattern to copy if you need more than one encoder polled from a single main loop.
+
+**[`src/ui/gray_canvas.hpp`](src/ui/gray_canvas.hpp) + [`src/ui/oled_renderer.hpp`](src/ui/oled_renderer.hpp)** — real 4-bit grayscale on an SSD1322 OLED via [U8g2](https://github.com/olikraus/u8g2), which is natively 1-bit-per-pixel (every lit pixel is full brightness). `GrayCanvas` is an 8 KB nibble framebuffer packed to match the panel's native format, so notes can be shaded by velocity; U8g2 is still used for panel bring-up and text, composited onto the gray canvas afterward. `OledRenderer` blits that framebuffer over SPI via DMA (`send()` returns immediately, freeing the ~8 ms transfer to overlap MIDI/input handling instead of blocking the main loop). Less drop-in than the two files above — it's tied to U8g2, Teensy's `EventResponder`, and this specific panel's init sequence — but the technique (shadow grayscale buffer + composited 1-bit overlay + async DMA blit) generalizes to any 1-bit display library you want more than 1-bit out of.
+
 ## Project status
 
 Mid-refactor, actively developed. See [`.claude/PLANS.md`](.claude/PLANS.md) for the phased roadmap and [`.claude/exec-plans/`](.claude/exec-plans/) for in-flight design docs. Data model, core MIDI pipeline, and the step sequencer control surface are done; the generator subsystem and OLED UI are in progress.
